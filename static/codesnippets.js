@@ -675,7 +675,7 @@ $(function () {
 
     Searcher.reset();
 
-    $('#search').attr('disabled', true).text('Searching');
+    $('#search').attr('disabled', true).text('Search');
 		$("input").prop('disabled', true);
     $('#logger').find('.oc').remove();
     $('#displayer').find('.oc').remove();
