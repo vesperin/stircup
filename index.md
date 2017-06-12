@@ -7,11 +7,11 @@ description: Source code typicality analyzer
 
 {% include centered.html text="Source code typicality analyzer"%}
 
-It's easy to get started with **Stircup**. You use it by first entering a query, and then pressing the **Search** button below. Behind the scenes, **Stircup** fetches a few batches of code examples from StackOverflow, ranked by significance to your query, ignores those ones that don't match some user given criteria, and then displays the top k most relevant ones. We compute _k_ like this: <span><img align="center" src="https://tex.s2cms.ru/svg/k%20%3D%20%7B%5Cleft%20%5Clceil%20%20%5Csqrt%7B%7Cresults%7C%7D%20%20%5Cright%20%5Crceil%7D" alt="k = {\left \lceil \sqrt{|results|} \right \rceil}." /></span>
+It's easy to get started with **Stircup**. You use it by first entering a query, and then pressing the **Search** button below. Behind the scenes, **Stircup** fetches a few batches of code examples from StackOverflow using their '/similar?' HTTP verb[^1], ignores those ones that don't match results criteria, and then returns a list of results, which can be further introspected using source code typicality analysis.
 
-The used criteria include: only Java and compilable code. The final result is either a list of k most relevant according StackOverflow's ranking or a list of k most typical results if the Rank results by typicality checkbox is checked.
+For pragmatic reasons, our results criteria include: only permit Java and compilable code is permitted. Future versions of **Stircup** will handle partial and complete Java programs.  
 
-The first time you use it, the results get cached on your browser. After that, every time you search, this is done on your computer.
+The first time you use **Stircup**, the generated results will get cached on your browser. After that, every time you search (using the same query), this search is done on your computer.
 
 <div id="columns">
     <div id="left-col">
@@ -31,9 +31,14 @@ The first time you use it, the results get cached on your browser. After that, e
     </div>
 </div>
 <div id="right-col">
-		<h4 style="font-family: Courier, monospace;font-size: 1.6rem;">Rank results by <span class="searcher"><input type="checkbox" id="sorting" value="typical"/><span class="typicality">Typicality</span></span></h4>
+		<h4 style="font-family: Courier, monospace;font-size: 1.6rem;">Sample results by <span class="searcher"><input type="checkbox" id="sorting" value="typical"/><span class="typicality">Typicality</span></span></h4>
     <div id="displayer"></div>
+    <!-- <div id="saver" class="hide">
+       Want list? <a href="#" id="download">Download it!</a>
+    </div> -->
 </div>
 <div id="clear"></div>
 
 Thank you for trying this app.
+
+[^1]: It returns questions which are similar to a hypothetical one based on one's query and tag combination (e.g., _java_ tag) 

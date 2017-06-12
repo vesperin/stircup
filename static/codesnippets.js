@@ -2,708 +2,1129 @@
 /**
  * @author Huascar A. Sanchez
  */
-$(function () {
+$(function() {
 
-  var VERSION = "1";
-  if (window.localStorage.ss_version !== VERSION) {
-    delete window.localStorage.answers;
-    delete window.localStorage.ss_page;
-    delete window.localStorage.query;
+	var VERSION = "1";
+	if (window.localStorage.ss_version !== VERSION) {
+		delete window.localStorage.answers;
+		delete window.localStorage.ss_page;
+		delete window.localStorage.query;
 		delete window.localStorage.cached;
-    window.localStorage.ss_version = VERSION;
-  }
-
-  //https://github.com/coolaj86/knuth-shuffle
-  //OR http://en.wikipedia.org/wiki/Fisher-Yates_shuffle
-  function shuffle(array) {
-    var currentIndex = array.length
-      , temporaryValue
-      , randomIndex
-      ;
-
-    // While there remain elements to shuffle...
-    while (0 !== currentIndex) {
-
-      // Pick a remaining element...
-      randomIndex = Math.floor(Math.random() * currentIndex);
-      currentIndex -= 1;
-
-      // And swap it with the current element.
-      temporaryValue = array[currentIndex];
-      array[currentIndex] = array[randomIndex];
-      array[randomIndex] = temporaryValue;
-    }
-
-    return array;
-  }
-
-  function parseArray(array) {
-    if (!array) {
-      return [];
-    }
-
-    return JSON.parse(array);
-  }
-
-  if (!String.prototype.trim) {
-    String.prototype.trim = function () {
-      return this.replace(/^\s+|\s+$/g, '');
-    };
-  }
-	
-	function product(args) {
-	    if(!args.length)
-	        return [[]];
-	    var prod = product(args.slice(1)), r = [];
-	    args[0].forEach(function(x) {
-	        prod.forEach(function(p) {
-	            r.push([x].concat(p));
-	        });
-	    });
-	    return r;
-	}	
-	
-	// Compute the edit distance between the two given strings
-	function editDistance(a, b) {
-	  if (a.length === 0) return b.length; 
-	  if (b.length === 0) return a.length; 
-
-	  var matrix = [];
-
-	  // increment along the first column of each row
-	  var i;
-	  for (i = 0; i <= b.length; i++) {
-	    matrix[i] = [i];
-	  }
-
-	  // increment each column in the first row
-	  var j;
-	  for (j = 0; j <= a.length; j++) {
-	    matrix[0][j] = j;
-	  }
-
-	  // Fill in the rest of the matrix
-	  for (i = 1; i <= b.length; i++) {
-	    for (j = 1; j <= a.length; j++) {
-	      if (b.charAt(i-1) == a.charAt(j-1)) {
-	        matrix[i][j] = matrix[i-1][j-1];
-	      } else {
-	        matrix[i][j] = Math.min(
-						matrix[i-1][j-1] + 1, 			 // substitution
-	          Math.min(matrix[i][j-1] + 1, // insertion
-	          matrix[i-1][j] + 1)); 			 // deletion
-	      }
-	    }
-	  }
-
-	  return matrix[b.length][a.length];
-	};	
-	
-	function normalizedEditDistance(a, b){
-		var ed  = editDistance(a, b)/1.0;
-		var len = Math.max(a.length, b.length)/1.0;
-		
-		return (ed/len);
-	};
-	
-	function distance(a, b){
-		return 1.0 - normalizedEditDistance(a, b);
+		window.localStorage.ss_version = VERSION;
 	}
 
-  function isBlock(code) {
-    if(!code) return false;
+	//https://github.com/coolaj86/knuth-shuffle
+	//OR http://en.wikipedia.org/wiki/Fisher-Yates_shuffle
+	function shuffle(array) {
+		var currentIndex = array.length,
+			temporaryValue, randomIndex;
 
-    var $code = $(code);
+		// While there remain elements to shuffle...
+		while (0 !== currentIndex) {
 
-    // if it's less than 5 lines of code, we don't treat it as a suitable
-    // code block
-    var text      = $code.text();
-    var matches 	= text.match(/\{([^}]+)\}/g) || [];
-    var splitText = text.split('\n');
-    var loc = splitText.length;
+			// Pick a remaining element...
+			randomIndex = Math.floor(Math.random() * currentIndex);
+			currentIndex -= 1;
 
-    if (loc < 5) return false;
+			// And swap it with the current element.
+			temporaryValue = array[currentIndex];
+			array[currentIndex] = array[randomIndex];
+			array[randomIndex] = temporaryValue;
+		}
 
-    var result = JavaDetector.guessLanguage($code);
-    var lang = result.language;
+		return array;
+	}
 
-    return JavaDetector.isLanguageSupported(lang, true);
+	function parseArray(array) {
+		if (!array) {
+			return [];
+		}
 
-  }
+		return JSON.parse(array);
+	}
+
+	if (!String.prototype.trim) {
+		String.prototype.trim = function() {
+			return this.replace(/^\s+|\s+$/g, '');
+		};
+	}
+
+	function product(args) {
+		if (!args.length)
+			return [
+				[]
+			];
+		var prod = product(args.slice(1)),
+			r = [];
+		args[0].forEach(function(x) {
+			prod.forEach(function(p) {
+				r.push([x].concat(p));
+			});
+		});
+		return r;
+	}
+
+	/**
+	 * thx to https://github.com/peterflynn/simple-sloc-counter
+	 * Counts lines of code in given text.
+	 * Throws 'Unsupported' exception in cases where it's not possible to give an accurate count.
+	 * @return {{total: number, sloc: number}}
+	 */
+	function countSloc(text) {
+
+		var lines = text.split(/\r\n|\r|\n/);
+
+		var codeLines = 0;
+		var inBlockComment = false;
+		var inString = false;
+		var stringDelim;
+
+		lines.forEach(function(line, lineNum) {
+
+			var i;
+			var sawCode = false;
+			for (i = 0; i < line.length; i++) {
+				var c = line[i];
+				if (inBlockComment) {
+					if (c === "/" && line[i - 1] === "*") {
+						inBlockComment = false;
+					}
+				} else if (inString) {
+					sawCode = true;
+					if (c === stringDelim) {
+						inString = false;
+					} else if (c === "\\") {
+						i++; // skip next char (escaped char)
+					}
+				} else {
+					// ignore all whitespace
+					if (c !== " " && c !== "\t") {
+						// opening of string
+						if (c === "\"" || c === "'") {
+							sawCode = true;
+							inString = true;
+							stringDelim = c;
+						} else if (c === "/") {
+							// opening of comment - MAYBE
+							if (line[i + 1] === "*") {
+								inBlockComment = true;
+								i++; // (no point in looking at the "*" again)
+							} else if (line[i + 1] === "/") {
+								break; // rest of line is a line comment
+							} else {
+								sawCode = true;
+
+								// A "/" also might be the start of a regexp literal. Detecting regexps is INSANELY difficult in JS
+								// and basically requires fully parsing the code. We care because, like a string literal, the regexp
+								// could contain strings like /* or " that we'd misinterpret. (Detecting where a regexp ENDS is no
+								// mean feat either, btw).
+								// So, we cheat: we only care about the rest of the line if it might contain something that affects
+								// how we count LATER lines. All other cases are unambiguous without us knowing whether a regexp is
+								// present or not.
+								if (line.indexOf("/*", i + 1) !== -1) {
+									throw ("Potential block comment start following potential regular expression on same line" + lineNum);
+								} else if (line.indexOf("\"", i + 1) !== -1 || line.indexOf("'", i + 1) !== -1) {
+									var trimmed = line.trim();
+									if (trimmed[trimmed.length - 1] === "\\") {
+										throw ("Potential multi-line string literal following potential regular expression on same line" + lineNum);
+									}
+								}
+								break; // ignore rest of line since we're not sure if it's a regexp and if so, where it ends
+							}
+						} else {
+							sawCode = true;
+
+							// mainly as a self-check, error out if we see a block-comment close when we think we're not in a block comment
+							if (c === "*" && line[i + 1] === "/") {
+								throw ("Unexpected */ when not in a block comment" + lineNum);
+							}
+						}
+					}
+				}
+			}
+
+			if (sawCode) {
+				codeLines++;
+			}
+			if (inString && line[line.length - 1] !== "\\") {
+				throw ("Unclosed string at end of line" + lineNum);
+			}
+		});
+
+		if (inBlockComment) {
+			throw ("Unclosed block comment at end of file");
+		} else if (inString) {
+			throw ("Unclosed string at end of file");
+		}
+
+		return {
+			total: lines.length,
+			sloc: codeLines
+		};
+	}
+
+	// Compute the edit distance between the two given strings
+	function editDistance(a, b) {
+		if (a.length === 0) return b.length;
+		if (b.length === 0) return a.length;
+
+		var matrix = [];
+
+		// increment along the first column of each row
+		var i;
+		for (i = 0; i <= b.length; i++) {
+			matrix[i] = [i];
+		}
+
+		// increment each column in the first row
+		var j;
+		for (j = 0; j <= a.length; j++) {
+			matrix[0][j] = j;
+		}
+
+		// Fill in the rest of the matrix
+		for (i = 1; i <= b.length; i++) {
+			for (j = 1; j <= a.length; j++) {
+				if (b.charAt(i - 1) == a.charAt(j - 1)) {
+					matrix[i][j] = matrix[i - 1][j - 1];
+				} else {
+					matrix[i][j] = Math.min(
+						matrix[i - 1][j - 1] + 1, // substitution
+						Math.min(matrix[i][j - 1] + 1, // insertion
+							matrix[i - 1][j] + 1)); // deletion
+				}
+			}
+		}
+
+		return matrix[b.length][a.length];
+	};
+
+	function normalizedEditDistance(a, b) {
+		var ed = editDistance(a, b) / 1.0;
+		var len = Math.max(a.length, b.length) / 1.0;
+
+		return (ed / len);
+	};
+
+	function splitString(string, search, replacement) {
+		return string.split(search).join(replacement);
+	};
+
+	// Compute and return the profile of s, as defined by Ukkonen "Approximate
+	// string-matching with q-grams and maximal matches".
+	// https://www.cs.helsinki.fi/u/ukkonen/TCS92.pdf The profile is the number
+	// of occurrences of k-shingles, and is used to compute q-gram similarity,
+	// Jaccard index, etc. Pay attention: the memory requirement of the profile
+	// can be up to k * size of the string
+	function qGrams(string) {
+		// Initialize their scores
+		var shingles = new Hashtable();
+
+		var string_no_space = splitString(string, ' ', '');
+		var k = 4;
+
+		for (var i = 0; i < (string_no_space.length - k + 1); i++) {
+			var shingle = string_no_space.substring(i, i + k);
+			if (shingles.containsKey(shingle)) {
+				var old = shingles.get(shingle);
+				shingles.put(shingle, old + 1);
+			} else {
+				shingles.put(shingle, 1);
+			}
+		}
+
+		return shingles;
+	}
+
+	function norm(map) {
+		var agg = 0.0;
+		var keys = map.keys();
+		keys.forEach(function(x) {
+			var old = map.get(x);
+			agg += 1.0 * (Math.pow(old, 2));
+		});
+
+		return Math.sqrt(agg);
+	}
+
+	function dotProduct(a, b) {
+		var small = b;
+		var big = a;
+
+		if (a.size() < b.size()) {
+			small = a;
+			big = b
+		}
+
+		var agg = 0;
+		var keys = small.keys();
+		keys.forEach(function(x) {
+			if (big.containsKey(x)) {
+				var bigVal = big.get(x);
+				var smallVal = small.get(x);
+				agg += 1.0 * (smallVal * bigVal);
+			}
+		});
+
+		return agg;
+	}
+
+	function cosineSimilarity(a, b) {
+		if (typeof a == 'undefined') return 0.0;
+		if (typeof b == 'undefined') return 0.0;
+		if (!a) return 0.0;
+		if (!b) return 0.0;
+
+		if (a == b) return 1.0;
+		if (a.length < 3 || b.length < 3) return 0.0;
+
+		var qGrams1 = qGrams(a);
+		var qGrams2 = qGrams(b);
+
+		return (1.0 * (dotProduct(qGrams1, qGrams2)) / (norm(qGrams1) * norm(qGrams2)));
+	}
+
+	function distance(a, b) {
+		return 1.0 - cosineSimilarity(a, b);
+	}
+
+	function sum(array) {
+		var num = 0;
+		for (var i = 0, l = array.length; i < l; i++) {
+			num += array[i];
+		}
+
+		return num;
+	}
+
+	function mean(array) {
+		return sum(array) / array.length;
+	}
+
+	function computeVariance(array) {
+		var m = mean(array);
+		return mean(array.map(function(num) {
+			return Math.pow(num - m, 2);
+		}));
+	}
 	
-  function toString(codes) {
-    var blocks = [];
+	function computeRadius(ranked) {
+		
+		var m = ranked[0];
+		var r = record[1];
+		var distances		= [];
+		
+		mapObj.keys().forEach(function(x){
+			var y = mapObj.get(x).code;
+			distances.push(distance(mostTypical.code, y));
+		});
+		
+		return mean(distance);
+	}	
 
-    codes = codes || [];
+	function computeStandardDeviation(variance) {
+		return Math.sqrt(variance);
+	}
 
-    for (var idx = 0; idx < codes.length; idx++) {
-      var code = codes[idx];
+	// probabilityDensityFunction
+	function probabilityDensityFunction(x, y, estimator, nconst) {
+		var a = 1.0 / (Math.sqrt(2 * Math.PI) * nconst /*normalized constant*/);
+		var d = distance(x, y);
+		var h = 2 * estimator;
+		var e = Math.exp(-(Math.pow(d, 2) / Math.pow(h, 2)));
+		return a * e;
+	};
+
+	var CLASS_PATTERN = /class[^;=\n]*\s[\S\s]*?(?={)/;
+	var METHOD_PATTERN = /^\s*?(((public|private|protected|static|final|native|synchronized|abstract|threadsafe|transient)\s+?)*)\s*?(\w+?)\s+?(\w+?)\s*?\(([^)]*)\)[\w\s,]*?(?={)?\s*?/;
+
+	function wrapCodeIfNeeded(code) {
+		var hasClass = code.match(CLASS_PATTERN);
+		var hasMethod = code.match(/(?:(?:public)|(?:private)|(?:static)|(?:protected)\s+)*/);
+
+		if (!hasMethod) {
+			code = "public void static main(String... args){\n" + code + "\n}";
+			if (!hasClass) {
+				code = "class CodeExample {\n" + code + "\n}";
+			}
+		} else if (!hasClass) {
+			code = "class CodeExample {\n" + code + "\n}";
+		}
+
+		return code;
+	}
+
+	function getObjects(obj, key, val) {
+		var objects = [];
+		for (var i in obj) {
+			if (!obj.hasOwnProperty(i)) continue;
+
+			if (typeof obj[i] == 'object') {
+				objects = objects.concat(getObjects(obj[i], key, val));
+			} else if (val.some(type => type === obj[i])) {
+				objects.push(obj);
+			} else if (Array.isArray(obj[key])) {
+				for (let item of obj[key]) {
+					objects = objects.concat(getObjects(item, key, val));
+				}
+			}
+		}
+
+		return objects;
+	}
+
+
+	function extractCodeFeatures(code) {
+		var result = parseJava(code);
+
+		function isFirstLetterCapital(value) {
+			if (!value) return false;
+			return value.charAt(0) === value.charAt(0).toUpperCase();
+		}
+
+
+		var interested = ["SimpleType", "ImportDeclaration", "TypeDeclaration", "PrimitiveType", "ParameterizedType", "ArrayType"];
+		var allTypes = getObjects(result, 'node', interested);
+
+		var allTypeNames = new Set();
+		allTypes.forEach(function(x) {
+			if (x.name) {
+				if ("Package" != x.name.identifier) {
+					allTypeNames.add(x.name.identifier);
+				}
+			} else if (x.primitiveTypeCode) {
+				if ("void" != x.primitiveTypeCode) {
+					allTypeNames.add(x.primitiveTypeCode);
+				}
+			} else if (x.componentType) {
+				if (x.componentType.primitiveTypeCode) {
+					if ("void" != x.componentType.primitiveTypeCode) {
+						allTypeNames.add(x.componentType.primitiveTypeCode);
+					}
+				} else if (x.componentType.name) {
+					if ("void" != x.componentType.name.identifier) {
+						allTypeNames.add(x.componentType.name.identifier);
+					}
+				}
+			}
+		});
+
+		return Array.from(allTypeNames).filter(isFirstLetterCapital);
+	}
+
+	function parseJava(code /*plain text*/ ) { // returns a JSON object
+		if (!code) return false;
+
+		code = wrapCodeIfNeeded(code);
+
+		try {
+			var result = JavaParser.parse(code);
+			// var str		 = JSON.stringify(result, null, 4);
+
+			if (result) {
+				return result;
+			} else {
+				throw "Unable to process compilation unit";
+			}
+		} catch (err) {
+			throw err;
+		}
+	}
+
+	function isBlock(code /*<code> element*/ ) {
+		if (!code) return false;
+
+		var $code = $(code);
+
+		// if it's less than 5 lines of code, we don't treat it as a suitable
+		// code block
+		var text = $code.text();
+		
+		// check if text is Java and compilable code
+
+		var isValid = false;
+		try {
+			var sloc = countSloc(text).sloc;
+			if (sloc <= 8) return false;
+			
+			parseJava(text);
+			// No error
+			isValid = true;
+		} catch (err) {
+			isValid = false;
+		}
+
+		return isValid;
+	}
+
+	function toString(codes) {
+		var blocks = [];
+
+		codes = codes || [];
+
+		for (var idx = 0; idx < codes.length; idx++) {
+			var code = codes[idx];
 			blocks.push($(code).text());
-    }
+		}
 
-    return blocks;
-  }
+		return blocks;
+	}
 
-  function validBlocks(codes) {
-    var blocks = [];
+	function validBlocks(codes) {
+		var blocks = [];
 
-    codes = codes || [];
+		codes = codes || [];
 
-    for (var idx = 0; idx < codes.length; idx++) {
-      var code = codes[idx];
-      if (isBlock($(code))) {
-        blocks.push(code);
-      }
-    }
+		for (var idx = 0; idx < codes.length; idx++) {
+			var code = codes[idx];
 
-    return blocks;
-  }
+			if (isBlock($(code))) {
+				blocks.push(code);
+			}
+		}
 
-  function isEmpty(blocks){
-    return (blocks === undefined || blocks.length == 0)
-  }
-	
-	function ensureCleanSlate(query){
-		if(window.localStorage.query !== query){
-	    delete window.localStorage.answers;
-	    delete window.localStorage.ss_page;
-	    delete window.localStorage.query;
+		if (blocks.length == 0) return blocks;
+
+		var longest = blocks.reduce(function(a, b) {
+			return a.length > b.length ? a : b;
+		});
+		var result = [];
+
+		result.push(longest);
+
+		return result;
+	}
+
+	function isEmpty(blocks) {
+		return (blocks === undefined || blocks.length == 0)
+	}
+
+	function ensureCleanSlate(query) {
+		if (window.localStorage.query !== query) {
+			delete window.localStorage.answers;
+			delete window.localStorage.ss_page;
+			delete window.localStorage.query;
 			delete window.localStorage.cached;
 			window.localStorage.ss_confirmed = false;
-			Searcher.answers 		= []; 
-			Searcher.page    		= 1;
-			Searcher.item    		= 0;
+			Searcher.answers = [];
+			Searcher.page = 1;
+			Searcher.item = 0;
 			Searcher.candidates = [];
-			Searcher.stop				= false;
+			Searcher.stop = false;
 
-	    window.localStorage.ss_version 	= VERSION;
-		  window.localStorage.query 			= query;
+			window.localStorage.ss_version = VERSION;
+			window.localStorage.query = query;
 		}
 	};
-	
-	function orderedHash() {
-	    var keys = [];
-	    var vals = {};
-			var idxs = {};
-	    
-			return {
-				clear: function(){
-					keys = [];
-					vals = {};
-					idxs = {};
-				},			
-				
-				push: function(k){
-					this.put(k, k);
-				},
 
-				put: function(k,v) {
-					if (!vals[k]) {
-						keys.push(k);
-						idxs[k] = keys.length - 1;
-					} 
-					vals[k] = v;
-	      },
-					
-				empty: function(){
-					return this.length() == 0;
-				},
-	      
-				val: function(k) {return vals[k]},
-	      
-				length: function(){return keys.length},
-	      
-				keys: function(){return keys},
-	      
-				values: function(){return vals}
-	    };
+	function orderedHash() {
+		var keys = [];
+		var vals = {};
+		var idxs = {};
+
+		return {
+			clear: function() {
+				keys = [];
+				vals = {};
+				idxs = {};
+			},
+
+			push: function(k) {
+				this.put(k, k);
+			},
+
+			put: function(k, v) {
+				if (!vals[k]) {
+					keys.push(k);
+					idxs[k] = keys.length - 1;
+				}
+				vals[k] = v;
+			},
+
+			empty: function() {
+				return this.length() == 0;
+			},
+
+			val: function(k) {
+				return vals[k]
+			},
+
+			length: function() {
+				return keys.length
+			},
+
+			keys: function() {
+				return keys
+			},
+
+			values: function() {
+				return vals
+			}
+		};
 	};
-	
-	function toAnswerArray(orderedHash){
-		if(!orderedHash) return [];
-		
+
+	function toAnswerArray(orderedHash) {
+		if (!orderedHash) return [];
+
 		var allKeys = orderedHash.keys();
-		var N				= allKeys.length;
-		var result  = [];
-		for(var idx = 0; idx < N; idx++){
+		var N = allKeys.length;
+		var result = [];
+		for (var idx = 0; idx < N; idx++) {
 			var key = allKeys[idx];
 			result.push(orderedHash.val(key));
 		}
-		
+
 		return result;
 	};
 
 
-  // Setup the main controller
-  var Searcher = {
-    page: window.localStorage.ss_page || 1,
-    item: 0,
-    answers: parseArray(window.localStorage.answers),
-    candidates: [],
-    api: 'http://api.stackexchange.com/2.2/',
-    stop: false,
+	// Setup the main controller
+	var Searcher = {
+		page: window.localStorage.ss_page || 1,
+		item: 0,
+		answers: parseArray(window.localStorage.answers),
+		candidates: [],
+		api: 'http://api.stackexchange.com/2.2/',
+		stop: false,
 
-    reset: function () {
-      Searcher.item = 0;
-      $('#output').val('');
-      $('#logger').empty().append($('<div>', {
-        class: 'oc',
-        text: 'search console'
-      }));
-      $('#displayer').empty().append($('<div>', {
-        class: 'oc',
-        text: 'selection console'
-      }));
-      $('#search').attr('disabled', false).text('SEARCH');
+		reset: function() {
+			Searcher.item = 0;
+			$('#output').val('');
+			$('#logger').empty().append($('<div>', {
+				class: 'oc',
+				text: 'search console'
+			}));
+			$('#displayer').empty().append($('<div>', {
+				class: 'oc',
+				text: 'selection console'
+			}));
+			$('#search').attr('disabled', false).text('SEARCH');
 			$("input").prop('disabled', false);
-      $('.done').hide();
-    },
+			$('.done').hide();
+		},
 
-    logger: function (text, class_suffix, to_append) {
-      var $div = $('<div>', {
-        'html': text,
-        'class': 'log-' + class_suffix
-      });
+		logger: function(text, class_suffix, to_append) {
+			var $div = $('<div>', {
+				'html': text,
+				'class': 'log-' + class_suffix
+			});
 
-      //noinspection JSJQueryEfficiency
-      $('#logger').append($div);
+			//noinspection JSJQueryEfficiency
+			$('#logger').append($div);
 
-      if (to_append) {
-        $div.append(to_append);
-      }
+			if (to_append) {
+				$div.append(to_append);
+			}
 
-      //noinspection JSJQueryEfficiency
-      $('#logger')[0].scrollTop = $('#logger')[0].scrollHeight;
-    },
+			//noinspection JSJQueryEfficiency
+			$('#logger')[0].scrollTop = $('#logger')[0].scrollHeight;
+		},
 
-    displayer: function (text, class_suffix, to_append) {
-      var $div = $('<div>', {
-        'html': text,
-        'class': 'disp-' + class_suffix
-      });
+		displayer: function(text, class_suffix, to_append) {
+			var $div = $('<div>', {
+				'html': text,
+				'class': 'disp-' + class_suffix
+			});
 
-      //noinspection JSJQueryEfficiency
-      $('#displayer').append($div);
+			//noinspection JSJQueryEfficiency
+			$('#displayer').append($div);
 
-      if (to_append) {
-        $div.append(to_append);
-      }
+			if (to_append) {
+				$div.append(to_append);
+			}
 
-      //noinspection JSJQueryEfficiency
-      $('#displayer')[0].scrollTop = $('#displayer')[0].scrollHeight;
-    },
+			//noinspection JSJQueryEfficiency
+			$('#displayer')[0].scrollTop = $('#displayer')[0].scrollHeight;
+		},
 
-    listCandidate: function (message) {
-      if (message) {
-        Searcher.displayer(message, "item");
-      }
-    },
+		listCandidate: function(message) {
+			if (message) {
+				Searcher.displayer(message, "item");
+			}
+		},
 
-    logError: function (reason) {
-      if (reason) {
-        Searcher.logger(reason, "error");
-      }
+		logError: function(reason) {
+			if (reason) {
+				Searcher.logger(reason, "error");
+			}
 
-      Searcher.item++;
-      Searcher.search();
-    },
+			Searcher.item++;
+			Searcher.search();
+		},
 
-    nextAnswer: function (message) {
-      if (message) {
-        Searcher.logger(message, "success");
-      }
+		nextAnswer: function(message) {
+			if (message) {
+				Searcher.logger(message, "success");
+			}
 
-      Searcher.item++;
-      Searcher.search();
-    },
-		
-		typicality: function(){
-			
+			Searcher.item++;
+			Searcher.search();
+		},
+
+		computeCodeTypicality: function() {
+
 			Searcher.displayer("Sorting code examples by typicality.", "info");
-			
-      // Output!
-      setTimeout(function () {
+
+			// Output!
+			setTimeout(function() {
 				var candidates = [];
-				if (Searcher.candidates.length == 0){
+				if (Searcher.candidates.length == 0) {
 					candidates = parseArray(window.localStorage.cached).items;
 				} else {
 					candidates = Searcher.candidates;
 				}
-				
-				var k 	= $("#topk").val();
-        var len = k ? k : candidates.length;
 
-        var entries = [];
+				// Get all source code lines of code
+				var sizes = [];
+				candidates.forEach(function(val) {
+					sizes.push(countSloc(val.code).sloc);
+				});
 
-        var candidateArray = candidates;        
-				
+				// Compute their variance and standard deviation
+				var variance = computeVariance(sizes);
+				var standDev = computeStandardDeviation(variance);
+
+				// Compute kernel estimator or bandwidth
+				var kernelEstimator = (1.06 * standDev) / Math.pow(sizes.length, (1.0 / 5));
+
+				var entries = [];
+				var candidateArray = candidates;
+
 				// Get all entries
 				var idx;
-				for (idx = 0; idx < len; idx++) {
-          var answerObject 	= candidateArray[idx];
-          var answer_id 		= answerObject.answer_id;
-					var answer_score 	= answerObject.score;
-          var link 					= answerObject.link ? answerObject.link : answerObject.href;
-					var code					= answerObject.code;
+				for (idx = 0; idx < candidates.length; idx++) {
 					
-          var entry = {
-            "title": answerObject.title
-            , "href": link
-            , 'target': '_blank'
-						, "code": code
-						, "answer_id": answer_id
-          };
+					var answerObject = candidateArray[idx];
+					var answer_id = answerObject.answer_id;
+					var answer_score = answerObject.score;
+					var link = answerObject.link ? answerObject.link : answerObject.href;
+					var code = answerObject.code;
 
-          entries.push(entry);
-        }
-				
+					var entry = {
+						"title": answerObject.title,
+						"href": link,
+						'target': '_blank',
+						"code": code,
+						"answer_id": answer_id
+					};
+
+					entries.push(entry);
+				}
+
 				// Initialize their scores
 				var T = new Hashtable();
-				
+				var S = new Set();
+
 				for (idx = 0; idx < entries.length; idx++) {
 					var e = entries[idx];
 					T.put(e, 0.0);
 				}
-				
+
 				// Compute each entry's typicality score
 				var array = [];
 				array.push(entries);
 				array.push(entries);
+
 				var cartesian = product(array);
-				
-				for(idx = 0; idx < cartesian.length; idx++){
+
+				for (idx = 0; idx < cartesian.length; idx++) {
 					var pair = cartesian[idx];
-					
+
 					var si = pair[0];
 					var sj = pair[1];
+
+					if(si.code === sj.code) continue;
+					var marker = new Set([si.answer_id, sj.answer_id]);
 					
-					var w = distance(si.code, sj.code);
+					if(S.has(marker)){
+						continue;
+					} else {
+						S.add(marker);
+					}
 					
+					var w = probabilityDensityFunction(si.code, sj.code, kernelEstimator, cartesian.length);
+
 					var Tsi = T.get(si) + w;
 					var Tsj = T.get(sj) + w;
-					
+
 					T.put(si, Tsi);
 					T.put(sj, Tsj);
 				}
-				
+
 				// Sorts entries on their typicality score				
 				var sortable = [];
-				for(idx = 0; idx < T.keys().length; idx++){
-					var entry = T.keys()[idx];
-					sortable.push([entry, T.get(entry)]);	
-				}
-				// for (var entry in T){
-				// 	sortable.push([entry, T[entry]]);
-				// }
+				T.keys().forEach(function(x){
+					var y = T.get(x);
+					sortable.push([x, y]);
+				});
 				
-				sortable.sort(function(a, b){
+				// for (idx = 0; idx < T.keys().length; idx++) {
+				// 	var entry = T.keys()[idx];
+				// 	sortable.push([entry, T.get(entry)]);
+				// }
+
+				sortable.sort(function(a, b) {
 					return b[1] - a[1];
 				});
 				
 				
-				for(idx = 0; idx < sortable.length; idx++){
+				// Thinning number of search results
+				var to = sortable[0];
+				var scores = [];
+				sortable.forEach(function(x){
+					scores.push(to[1] - x[1]);
+				});
+				
+				var radius = mean(scores);
+				
+				for (idx = 0; idx < sortable.length; idx++) {
+					var t = sortable[idx][1];
+					
+					if((to[1] - t) > radius) continue;
+					
 					var s = sortable[idx][0];
-					
-          var answer_id 		= s.answer_id;
-					var answer_score 	= s.score;
-          var link 					= s.link ? s.link : s.href;
-					var code					= s.code;
-					
-          Searcher.displayer("Code example ", "trying", $('<a>', {
-            'text': answer_id,
-            'href': link,
-            'target': '_blank'
-          }));
-          
+
+					var answer_id = s.answer_id;
+					var answer_score = s.score;
+					var link = s.link ? s.link : s.href;
+					var code = s.code;
+
+					Searcher.displayer("Code example ", "trying", $('<a>', {
+						'text': answer_id,
+						'href': link,
+						'target': '_blank'
+					}));
+
 					Searcher.listCandidate("Code example candidate");
 				}
-				
-        $('#search').attr('disabled', false).text('Search Again');
+
+				$('#search').attr('disabled', false).text('Again?');
 				$("input").prop('disabled', false);
-        Searcher.wait(false);
-        Searcher.item++;
-        setTimeout(function () {
-          $('.done').fadeIn();
-        }, 400);
+				Searcher.wait(false);
+				Searcher.item++;
+				setTimeout(function() {
+					$('.done').fadeIn();
+				}, 400);
 
-      }, 230); // Don't freeze up the browser
-		},
-		
-		foundCandidates: function(){
-      Searcher.logger("Found enough suitable code snippets", "success");
-
-      Searcher.displayer("Fetching code examples", "trying");
-      Searcher.displayer("Downloading code examples, ready to try.", "info");
+			}, 230); // Don't freeze up the browser
 		},
 
-    fetchCandidates: function (lengthAsBound) {			
+		foundCandidates: function() {
+			Searcher.logger("Found enough suitable code snippets", "success");
 
-      // Output!
-      setTimeout(function () {
+			Searcher.displayer("Fetching code examples", "trying");
+			Searcher.displayer("Downloading code examples, ready to try.", "info");
+		},
+
+		fetchCandidates: function() {
+
+			// Output!
+			setTimeout(function() {
+				// TODO(Huascar) delete this and all its references throughout the code
 				var k = $("#topk").val();
-				
+
 				var candidates = [];
-				if (Searcher.candidates.length == 0){
+				if (Searcher.candidates.length == 0) {
 					candidates = parseArray(window.localStorage.cached).items;
 				} else {
 					candidates = Searcher.candidates;
 				}
-				
-				
-        var len = lengthAsBound ? candidates.length : k;
 
-        var cached = [];
+				var cached = [];
 
-        var shuffledArray = candidates;
+				var shuffledArray = candidates;
 
-        for (var idx = 0; idx < len; idx++) {
-          var answerObject 	= shuffledArray[idx];
-          var answer_id 		= answerObject.answer_id;
-					var answer_score 	= answerObject.score;
-          var link 					= answerObject.link ? answerObject.link : answerObject.href;
-					var code					= answerObject.code;
-					
-          Searcher.displayer("Code example ", "trying", $('<a>', {
-            'text': answer_id,
-            'href': link,
-            'target': '_blank'
-          }));
+				for (var idx = 0; idx < candidates.length; idx++) {
+					var answerObject = shuffledArray[idx];
+					var answer_id = answerObject.answer_id;
+					var answer_score = answerObject.score;
+					var link = answerObject.link ? answerObject.link : answerObject.href;
+					var code = answerObject.code;
 
-          var entry = {
-            "title": answerObject.title
-            , "href": link
-            , 'target': '_blank'
-						, "code": code
-						, "answer_id": answer_id
-          };
+					Searcher.displayer("Code example ", "trying", $('<a>', {
+						'text': answer_id,
+						'href': link,
+						'target': '_blank'
+					}));
 
-          cached.push(entry);
+					var entry = {
+						"title": answerObject.title,
+						"href": link,
+						'target': '_blank',
+						"code": code,
+						"answer_id": answer_id
+					};
 
-          Searcher.listCandidate("Code example candidate");
-        }
+					cached.push(entry);
 
-        var cachedCandidates = {
-          "items": cached
-        };
+					Searcher.listCandidate("Code example candidate");
+				}
 
-        window.localStorage.setItem("cached", JSON.stringify(cachedCandidates));
+				var cachedCandidates = {
+					"items": cached
+				};
 
-        $('#search').attr('disabled', false).text('Search Again');
+				window.localStorage.setItem("cached", JSON.stringify(cachedCandidates));
+
+				$('#search').attr('disabled', false).text('Again?');
 				$("input").prop('disabled', false);
-        Searcher.wait(false);
-        Searcher.item++;
-        setTimeout(function () {
-          $('.done').fadeIn();
-        }, 400);
+				Searcher.wait(false);
+				Searcher.item++;
+				setTimeout(function() {
+					$('.done').fadeIn();
+				}, 400);
 
-        Searcher.candidates = []; // clear array
+				Searcher.candidates = []; // clear array
 
-      }, 230); // Don't freeze up the browser
-    },
+			}, 230); // Don't freeze up the browser
+		},
 
-    nextPage: function () {
-      if (parseInt(Searcher.page) >= 7) {
-        Searcher.logger("Out of answers from StackOverflow!", "out");
-        $('#search').attr('disabled', false).text('Start Again');
-        Searcher.wait(false);
-        return false;
-      }
+		nextPage: function() {
+			if (parseInt(Searcher.page) >= 7) {
+				Searcher.logger("Out of answers from StackOverflow!", "out");
+				$('#search').attr('disabled', false).text('Again?');
+				Searcher.wait(false);				
+				return false;
+			}
 
-      Searcher.logger("Fetching page " + Searcher.page + "...", "trying");
+			Searcher.logger("Fetching page " + Searcher.page + "...", "trying");
+
+			var query = $("#query").val();
+			var splits = query.split(/[ ,]+/);
 			
-			var query  	= $("#query").val();
-			var splits 	= query.split(/[ ,]+/);
-			var uquery 	= splits.join("+");
-			var encoded	= encodeURIComponent(query);
+			// stemm query and used use nouns as tags
+			var noStemmedQ	= new Set(splits);
+			var stemmedQ		= new Set(splits.map(function(x){ return stemmer(x) }));
+			
+			var tagsQ = [];
+			stemmedQ.forEach(function(x){
+				if(noStemmedQ.has(x)){
+					tagsQ.push(x);
+				}
+			});
+			
+			var tagsQtext = "java;";// + tagsQ.join(";")
+			
+			
+			var uquery = splits.join("+");
+			var encoded = encodeURIComponent(query);
 
 			// search/advanced?todate=1471910400&order=desc&sort=relevance&q=quick%2Bselect&accepted=True&notice=False&tagged=java&site=stackoverflow
-      var common_url = '&pagesize=100&order=desc&site=stackoverflow&todate=1471910400';
-      var question_url = Searcher.api + 'similar?sort=relevance&accepted=True&notice=False&tagged=java&title=' + encoded + '&page=' + Searcher.page + common_url;
+			var common_url = '&pagesize=100&order=desc&site=stackoverflow&fromdate=960508800&todate=1496880000';
+			var question_url = Searcher.api + 'similar?q=' + uquery + '&sort=relevance&closed=False&accepted=True&notice=False&tagged=java&title=' + encoded + '&page=' + Searcher.page + common_url;
 
-      var titles = {};
-			
+			var titles = {};
+
 			var relevantOrder = orderedHash();
 
-      $.getJSON(question_url, function (data_questions) {
-        var answer_ids = [];
-        $.each(data_questions['items'], function (k, v) {
-          if (v.accepted_answer_id) {
-            answer_ids.push(v.accepted_answer_id);
-            titles[v.question_id] = v.title;
+			$.getJSON(question_url, function(data_questions) {
+				var answer_ids = [];
+				$.each(data_questions['items'], function(k, v) {
+					if (v.accepted_answer_id) {
+						answer_ids.push(v.accepted_answer_id);
+						titles[v.question_id] = v.title;
 						relevantOrder.push(v.accepted_answer_id);
-          }
-        });
+					}
+				});
 
 				// it looks 
-        //var answer_url = Searcher.api + 'answers/' + answer_ids.join(';') + '?sort=activity&filter=!9hnGsyXaB' + common_url;
-				
+				//var answer_url = Searcher.api + 'answers/' + answer_ids.join(';') +
+				//'?sort=activity&filter=!9hnGsyXaB' + common_url;
+
 				var answer_url = Searcher.api + 'answers/' + answer_ids.join(';') + '?filter=!9hnGsyXaB' + common_url;
-        $.getJSON(answer_url, function (data_answers) {
-          Searcher.logger("Answers downloading, ready to check.", "success");
-          $.each(data_answers['items'], function (k, v) {
-
+				$.getJSON(answer_url, function(data_answers) {
+					Searcher.logger("Answers downloading, ready to check.", "success");
+					$.each(data_answers['items'], function(k, v) {
+						
 						relevantOrder.put(v.answer_id, {
-            	'answer_id': v.answer_id,
-            	'question_id': v.question_id,
-            	'link': 'http://stackoverflow.com/questions/' + v.question_id + '/#' + v.answer_id,
-            	'body': v.body,
-            	'score': v.score,
-            	'title': titles[v.question_id] || ""
-							}
-						);
-          });
-					
-					Searcher.answers = Searcher.answers.concat(toAnswerArray(relevantOrder));
-					
-          // Save the new answers
-          window.localStorage.answers = JSON.stringify(Searcher.answers);
+							'answer_id': v.answer_id,
+							'question_id': v.question_id,
+							'link': 'http://stackoverflow.com/questions/' + v.question_id + '/#' + v.answer_id,
+							'body': v.body,
+							'score': v.score,
+							'title': titles[v.question_id] || ""
+						});
+					});
 
-          Searcher.page = parseInt(Searcher.page, 10) + 1;
-          window.localStorage.ss_page = Searcher.page;
+					var candidates = toAnswerArray(relevantOrder).filter(function(x){
+						return isNaN(x);
+					});
+					Searcher.answers = Searcher.answers.concat(candidates);
 
-          Searcher.search();
-        });
-      });
-    },
+					// Save the new answers
+					window.localStorage.answers = JSON.stringify(Searcher.answers);
 
-    search: function () {
-      if (Searcher.stop) {
-        Searcher.logger("Stopped by user", "out");
-        $('#search').attr('disabled', false).text('Search Again');
+					Searcher.page = parseInt(Searcher.page, 10) + 1;
+					window.localStorage.ss_page = Searcher.page;
+
+					Searcher.search();
+				});
+			});
+		},
+
+		search: function() {
+			if (Searcher.stop) {
+				Searcher.logger("Stopped by user", "out");
+				$('#search').attr('disabled', false).text('Again?');
 				$("input").prop('disabled', false);
-        Searcher.wait(false);
-        Searcher.stop = false;
-        Searcher.reset();
-        return false;
-      }
+				Searcher.wait(false);
+				Searcher.stop = false;
+				Searcher.reset();
+				return false;
+			}
 
-      Searcher.stop = false;
+			Searcher.stop = false;
 
-      if (Searcher.item >= Searcher.answers.length) {
-        Searcher.nextPage();
-        return false;
-      }
+			if (Searcher.item >= Searcher.answers.length) {
+				Searcher.nextPage();
+				return false;
+			}
 
-      $('.done').hide();
+			$('.done').hide();
 
-      Searcher.wait(true);
+			Searcher.wait(true);
 
-      // Output!
-      setTimeout(function () {
-        var answer_id = Searcher.answers[Searcher.item].answer_id;
-        var link = Searcher.answers[Searcher.item].link;
+			// Output!
+			setTimeout(function() {
+				var answer_id = Searcher.answers[Searcher.item].answer_id;
+				var link = Searcher.answers[Searcher.item].link;
 
-        Searcher.logger("Checking code example ", "trying", $('<a>', {
-          'text': answer_id,
-          'href': link,
-          'target': '_blank'
-        }));
+				Searcher.logger("Checking code example ", "trying", $('<a>', {
+					'text': answer_id,
+					'href': link,
+					'target': '_blank'
+				}));
+
+				Searcher.examineAnswer();
+
+			}, 230); // Don't freeze up the browser
+		},
+
+		examineAnswer: function() {
+			var answer	= Searcher.answers[Searcher.item].body;
+			var title		= Searcher.answers[Searcher.item].title;
+			var query		= $("#query").val(); 
+			var splitQ	= new Set(query.split(/[ ,]+/).map(function(x){ return stemmer(x.toLowerCase()) }));
+			var splitT	= new Set(title.split(/[ ,]+/).map(function(x){ return stemmer(x.toLowerCase()) }));
+			
+			function intersection(setA, setB) {
+				var intersection = new Set();
+				for (var elem of setB) {
+						if (setA.has(elem)) {
+							intersection.add(elem);
+						}
+			  }
 				
-        Searcher.examineAnswer();
+				return intersection;
+			}
+			
+			
+			if (intersection(splitQ, splitT).size > 0){
+				var codes = answer ? answer.match(/<code>(.|[\n\r])*?<\/code>/g) : [];
 
-      }, 230); // Don't freeze up the browser
-    },
+				var blocks = validBlocks(codes);
+				if (!isEmpty(blocks)) {
+					if ((parseInt(Searcher.page) >= 6) || (Searcher.candidates.length >= 20)) {
+						Searcher.foundCandidates();
+						Searcher.fetchCandidates();
+					} else {
+						var item = Searcher.answers[Searcher.item];
+						item.code = toString(blocks).join("\n");
 
-    examineAnswer: function () {
-      var answer = Searcher.answers[Searcher.item].body;
-      var codes = answer.match(/<code>(.|[\n\r])*?<\/code>/g);
+						// e.g., types, loop structures, parameter arity
+						item.features = extractCodeFeatures(wrapCodeIfNeeded(item.code));
 
-      var blocks = validBlocks(codes);
-      if(!isEmpty(blocks)){
-        if (Searcher.candidates.length >= 20) { // arbitrary number
-					Searcher.foundCandidates();
-          Searcher.fetchCandidates(false);
-        } else {
-					var item 	= Searcher.answers[Searcher.item];
-					item.code = toString(blocks).join("\n");
-          Searcher.candidates.push(item);
-          Searcher.nextAnswer("Found a valid code example");
-        }
-      } else { // no valid code found
-        Searcher.logError("Invalid Java code example");
-      }
+						Searcher.candidates.push(item);
+						Searcher.nextAnswer("Found a valid code example");
+					}
+				} else { // no valid code found
+					Searcher.logError("Invalid Java code example");
+				}	
+			} else {
+				Searcher.logError("Invalid Java code example");
+			}
 
-    },
+		},
 
-    wait: function (state) {
-      $('.sad-waiter').css({
-        height: state ? 137 : 0
-      }).find('.hour, .minute').css({
-        display: state ? 'block' : 'none'
-      });
-      $('#stopper').toggleClass('hide', !state);
-    },
+		wait: function(state) {
+			$('.sad-waiter').css({
+				height: state ? 137 : 0
+			}).find('.hour, .minute').css({
+				display: state ? 'block' : 'none'
+			});
+			$('#stopper').toggleClass('hide', !state);
+		},
 
-    setupConsoles: function () {
-      $('#logger').empty().append($('<div>', {
-        class: 'oc',
-        text: 'search console'
-      }));
-      $('#displayer').empty().append($('<div>', {
-        class: 'oc',
-        text: 'selection console'
-      }));
-    }
-  };
+		setupConsoles: function() {
+			$('#logger').empty().append($('<div>', {
+				class: 'oc',
+				text: 'search console'
+			}));
+			$('#displayer').empty().append($('<div>', {
+				class: 'oc',
+				text: 'selection console'
+			}));
+		}
+	};
 
-  Searcher.wait(false);
-  Searcher.setupConsoles();
+	Searcher.wait(false);
+	Searcher.setupConsoles();
 
-  $('#search').click(function () {
-		
+	$('#search').click(function() {
+
 		var query = $("#query").val();
-		
-		if(!query){
+
+		if (!query) {
 			alert("Please provide a query");
 			$("#query").focus();
-			
-      return false;
+
+			return false;
 		}
-		
+
 		ensureCleanSlate(query);
-				
-    // Disclaimer
-    // TODO: Use better modal?
-    var warn = "Ready for fetching arbitrary Java code examples from StackOverflow?";
-    var ready = window.localStorage.ss_confirmed || confirm(warn);
-    
+
+		// Disclaimer
+		// TODO: Use better modal?
+		var warn = "Ready for fetching arbitrary Java code examples from StackOverflow?";
+		var ready = window.localStorage.ss_confirmed || confirm(warn);
+
 		if (!ready) {
-      return false;
-    }
-		
-    window.localStorage.ss_confirmed = true;
+			return false;
+		}
 
-    Searcher.reset();
+		window.localStorage.ss_confirmed = true;
 
-    $('#search').attr('disabled', true).text('Search');
+		Searcher.reset();
+
+		$('#search').attr('disabled', true).text('Search');
 		$("input").prop('disabled', true);
-    $('#logger').find('.oc').remove();
-    $('#displayer').find('.oc').remove();
+		$('#logger').find('.oc').remove();
+		$('#displayer').find('.oc').remove();
 		$("input[type=checkbox]").prop("checked", false);
-    Searcher.stop = false;
+		Searcher.stop = false;
 
-    Searcher.search();
-  });
+		Searcher.search();
+	});
 
-  $('#stop').click(function () {
-    Searcher.stop = true;
-    return false;
-  });
-	
-	var checkboxes = $("input[type=checkbox]"); 
-		checkboxArray = Array.from( checkboxes );
+	$('#stop').click(function() {
+		Searcher.stop = true;
+		return false;
+	});
+
+	var checkboxes = $("input[type=checkbox]");
+	checkboxArray = Array.from(checkboxes);
 
 	function confirmCheck() {
 		$('#displayer').empty();
-  	if (this.checked) {
-    	Searcher.typicality();
-  	} else {
-  		Searcher.fetchCandidates(false);
-  	}
+		if (this.checked) {
+			Searcher.computeCodeTypicality();
+		} else {
+			Searcher.fetchCandidates();
+		}
 	}
 
 	checkboxArray.forEach(function(checkbox) {
-  	checkbox.addEventListener('change', confirmCheck);
+		checkbox.addEventListener('change', confirmCheck);
 	});
 
 });
