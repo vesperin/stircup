@@ -829,32 +829,32 @@ $(function() {
 
 			// Output!
 			setTimeout(function() {
-				var candidates = [];
-				if (Searcher.candidates.length == 0) {
-					candidates = parseArray(window.localStorage.cached).items;
-				} else {
-					candidates = Searcher.candidates;
-				}
+				// var candidates = [];
+				// if (Searcher.candidates.length == 0) {
+				// 	candidates = parseArray(window.localStorage.cached).items;
+				// } else {
+				// 	candidates = Searcher.candidates;
+				// }
 
-				// Get all source code lines of code
-				var sizes = [];
-				candidates.forEach(function(val) {
-					sizes.push(countSloc(val.code).sloc);
-				});
+				// // Get all source code lines of code
+				// var sizes = [];
+				// candidates.forEach(function(val) {
+				// 	sizes.push(countSloc(val.code).sloc);
+				// });
 
 				// Compute their variance and standard deviation
-				var variance = computeVariance(sizes);
-				var standDev = computeStandardDeviation(variance);
+				var variance = Searcher.variance; //computeVariance(sizes);
+				var standDev = Searcher.standDev; //computeStandardDeviation(variance);
 
 				// Compute kernel estimator or bandwidth
-				var kernelEstimator = (1.06 * standDev) / Math.pow(sizes.length, (1.0 / 5));
+				var kernelEstimator = Searcher.kernelEstimator; //(1.06 * standDev) / Math.pow(sizes.length, (1.0 / 5));
 
 				var entries = [];
-				var candidateArray = candidates;
+				var candidateArray = Searcher.candidateArray;
 
 				// Get all entries
 				var idx;
-				for (idx = 0; idx < candidates.length; idx++) {
+				for (idx = 0; idx < candidateArray.length; idx++) {
 					
 					var answerObject = candidateArray[idx];
 					var answer_id = answerObject.answer_id;
@@ -1325,7 +1325,33 @@ $(function() {
 	function confirmCheck() {
 		$('#displayer').empty();
 		if (this.checked) {
-			Searcher.computeCodeTypicality();
+			setTimeout(function(){
+				
+				var candidates = [];
+				if (Searcher.candidates.length == 0) {
+					candidates = parseArray(window.localStorage.cached).items;
+				} else {
+					candidates = Searcher.candidates;
+				}
+				
+				Searcher.candidateArray = candidates;
+				
+				// Get all source code lines of code
+				var sizes = [];
+				candidates.forEach(function(val) {
+					sizes.push(countSloc(val.code).sloc);
+				});
+
+				// Compute their variance and standard deviation
+				Searcher.variance = computeVariance(sizes);
+				Searcher.standDev = computeStandardDeviation(Searcher.variance);
+				// Compute kernel estimator or bandwidth
+				Searcher.kernelEstimator = (1.06 * Searcher.standDev) / Math.pow(sizes.length, (1.0 / 5));
+				
+				setTimeout(function(){
+					Searcher.computeCodeTypicality();
+				});
+			}, 230);
 		} else {
 			$("#GaussianKernel > tbody").hide();
 			Searcher.fetchCandidates();
