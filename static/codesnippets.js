@@ -63,6 +63,50 @@ $(function() {
 		});
 		return r;
 	}
+	
+	function slocSyntax(sloc){
+		sloc = sloc || "<9";
+		
+		var limit = sloc.match(/\d+/)[0] || 9;
+		limit     = parseInt(limit);
+		var oper  = sloc.replace(/\d+/, "") || "<";
+		
+		
+		return {
+			limit: limit,
+			oper: oper
+		};
+	}
+	
+	function attsSyntax(atts){
+		atts = atts || "4grams";
+		
+		var result = {};
+		
+		switch(atts){
+	    case "types":
+	    	result.istypes = true;
+	    	break;
+	    case "chars":
+	    	result.ischars = true;
+	    	break;	
+	    case "punits":
+	    	result.ispunits = true;
+	    	break;	
+	    default:
+				if(atts.indexOf("grams") !== -1){
+					var limit  = atts.match(/\d+/)[0] || 4;
+					limit      = parseInt(limit);
+			
+					result.splits  = limit;
+					result.isgrams = true;
+				} else {
+						throw "Sorry, we could not understand the atts.";	
+				}
+		}
+		
+		return result;
+	}
 
 	/**
 	 * thx to https://github.com/peterflynn/simple-sloc-counter
@@ -222,6 +266,10 @@ $(function() {
 
 		var string_no_space = splitString(string, ' ', '');
 		var k = 4;
+		
+		if(Searcher.atts.isgrams){
+			k = Searcher.atts.splits;
+		}
 
 		for (var i = 0; i < (string_no_space.length - k + 1); i++) {
 			var shingle = string_no_space.substring(i, i + k);
@@ -280,12 +328,16 @@ $(function() {
 
 		var qGrams1 = qGrams(a);
 		var qGrams2 = qGrams(b);
-
+		
 		return (1.0 * (dotProduct(qGrams1, qGrams2)) / (norm(qGrams1) * norm(qGrams2)));
 	}
 
-	function distance(a, b) {
-		return 1.0 - cosineSimilarity(a, b);
+	function distance(a, b) { // a and b are strings
+		if(Searcher.atts.isgrams || Searcher.atts.istypes || Searcher.atts.ispunits){
+			return 1.0 - cosineSimilarity(a, b);
+		} else {
+			return 1.0 - normalizedEditDistance(a, b);
+		}
 	}
 
 	function sum(array) {
@@ -372,16 +424,26 @@ $(function() {
 
 		return objects;
 	}
+	
+	function getAllProgramUnits(result){
 
+		var interested = ["IfStatement", "BlockStatements", "WhileStatement", "DoStatement", "LabeledStatement", "InfixExpression", "EnhancedForStatement", "ForStatement", "TryStatement", "LocalVariableDeclarationStatement", "VariableDeclarationStatement", "SwitchStatement", "SynchronizedStatement", "ReturnStatement", "ThrowStatement", "BreakStatement", "ContinueStatement", "EmptyStatement"];
+		var allStatements = getObjects(result, 'node', interested);
+		var allStatementNames = new Set();
+		
+		allStatements.forEach(function(x) {
+			allStatementNames.push(x.node);
+		});
+		
+		return Array.from(allTypeNames);
+	}
 
-	function extractCodeFeatures(code) {
-		var result = parseJava(code);
+	function getAllTypes(result){
 
 		function isFirstLetterCapital(value) {
 			if (!value) return false;
 			return value.charAt(0) === value.charAt(0).toUpperCase();
 		}
-
 
 		var interested = ["SimpleType", "ImportDeclaration", "TypeDeclaration", "PrimitiveType", "ParameterizedType", "ArrayType"];
 		var allTypes = getObjects(result, 'node', interested);
@@ -410,6 +472,17 @@ $(function() {
 		});
 
 		return Array.from(allTypeNames).filter(isFirstLetterCapital);
+	}
+
+	function extractCodeFeatures(code) {
+		var result = parseJava(code);
+		if(Searcher.atts.istypes){
+			return getAllTypes(result);
+		} else if(Searcher.atts.ispunits){
+			return getAllProgramUnits(result);
+		} else {
+			return [];
+		}
 	}
 
 	function parseJava(code /*plain text*/ ) { // returns a JSON object
@@ -441,11 +514,27 @@ $(function() {
 		var text = $code.text();
 		
 		// check if text is Java and compilable code
+		
+		var limit = Searcher.sloc.limit || 8;
+		limit     = parseInt(limit);
+		var oper  = Searcher.sloc.oper  || '<=';
 
 		var isValid = false;
 		try {
 			var sloc = countSloc(text).sloc;
-			if (sloc <= 8) return false;
+			switch (oper) {
+			  case '<':
+					if (sloc < limit) return false;
+					break;
+				case '<=':
+					if (sloc <= limit) return false;
+					break;	
+				default:
+					throw "Sorry, we could not understand the operator.";	
+			}
+			
+			// var sloc = countSloc(text).sloc;
+			// if (sloc <= 8) return false;
 			
 			parseJava(text);
 			// No error
@@ -493,6 +582,140 @@ $(function() {
 		result.push(longest);
 
 		return result;
+	}
+	
+	
+	function roundTo(num, decimals){
+		var shift = Math.pow(10, decimals);
+		return Math.round(num * shift) / shift;
+	};
+	
+	function sameId(a, b) {
+	  var nameA = a.name.toUpperCase(); // ignore upper and lowercase
+	  var nameB = b.name.toUpperCase(); // ignore upper and lowercase
+	  if (nameA < nameB) {
+	    return -1;
+	  }
+	  if (nameA > nameB) {
+	    return 1;
+	  }
+
+	  // names must be equal
+	  return 0;
+	}
+	
+	function showGaussianKernels(tableView/*hashtable*/, winner){
+		setTimeout(function() {
+			
+			var hcols = tableView.keys();
+			var hrows = hcols.concat();
+			
+			var gausstable = $("#GaussianKernel > tbody"); // HTML DOM object
+			
+			var header = $('<tr>');
+			header.append('<td></td>');
+			hcols.forEach(function(l){
+				header.append($('<th scope="col">' + l + '</th>'));
+			});
+			
+			gausstable.append(header);
+			
+			var allRows = [];
+			hrows.forEach(function(row, idx){
+				var i = row;
+				var val = tableView.get(i); // hashtable({id -> score})
+				
+				var newRow = (winner === i) ? $('<tr>').addClass('highlight') : $('<tr>');
+				var rlbl = $('<th scope="row">' + i + '</th>');
+				newRow.append(rlbl);
+				
+				hcols.forEach(function(col){
+					var j = col;
+					
+					if(i === j){ // add zero
+						newRow.append($('<td>' + 0.0 + '</td>'));	
+					} else {
+						newRow.append($('<td>' + val.get(j) + '</td>'));	
+					}
+					
+				});
+				
+				allRows.push(newRow);
+			});
+			
+			allRows.forEach(function(each){
+				gausstable.append(each);
+			});
+			
+			
+			gausstable.show();
+						
+		}, 230);
+	}
+		
+	function showGaussialKernelCalculations(compatibleOnes, headermap){
+		
+		setTimeout(function() {
+			
+			var gausstable = $("#GaussianKernel > tbody"); // HTML DOM object
+			
+			var headercol = [];
+			var headerrow = [];
+			var rows	 		= [];
+			var row				= [];
+			
+			
+			headermap.keys().forEach(function(k){
+				headercol.push(k);
+				headerrow.push(k);
+			});
+
+			var pivot		= compatibleOnes[0].a;
+
+			compatibleOnes.forEach(function(o, idx){
+
+				row.push(o.c);
+				
+				var next    = compatibleOnes[idx + 1];
+				var hasNext = (typeof next !== 'undefined'); 
+				
+				if(hasNext && (pivot !== next.a)){
+					rows.push(row);
+					row = [];
+					pivot = next.a;
+				}
+				
+			});
+			
+			
+			var header = $('<tr>');
+			header.append('<td></td>');
+			headercol.forEach(function(l){
+				header.append($('<th scope="col">' + l + '</th>'));
+			});
+
+			gausstable.append(header);
+
+			rows.forEach(function(row, i){
+				var rowhtml = $('<tr>');
+				rowhtml.append($('<th scope="row">' + headerrow.shift() + '</th>'));
+				
+				row.forEach(function(e, j){
+					if(i === j){ // diagonal
+						var zero = 0.0;
+						rowhtml.append($('<td>' + zero + '</td>'));
+					} else {
+						var cell = $('<td>' + e + '</td>');
+						rowhtml.append(cell);	
+					}
+				});
+	
+				gausstable.append(rowhtml);
+			});
+
+			gausstable.show();			
+			
+		}, 230); // Don't freeze up the browser
 	}
 
 	function isEmpty(blocks) {
@@ -620,7 +843,7 @@ $(function() {
 			$('#logger')[0].scrollTop = $('#logger')[0].scrollHeight;
 		},
 
-		displayer: function(text, class_suffix, to_append) {
+		displayer: function(text, class_suffix, to_append, extra) {
 			var $div = $('<div>', {
 				'html': text,
 				'class': 'disp-' + class_suffix
@@ -631,6 +854,10 @@ $(function() {
 
 			if (to_append) {
 				$div.append(to_append);
+			}
+			
+			if(extra){
+				$div.append(extra);
 			}
 
 			//noinspection JSJQueryEfficiency
@@ -699,13 +926,16 @@ $(function() {
 					var answer_score = answerObject.score;
 					var link = answerObject.link ? answerObject.link : answerObject.href;
 					var code = answerObject.code;
+					// e.g., types, loop structures, parameter arity
+					var feats = extractCodeFeatures(wrapCodeIfNeeded(code));
 
 					var entry = {
 						"title": answerObject.title,
 						"href": link,
 						'target': '_blank',
 						"code": code,
-						"answer_id": answer_id
+						"answer_id": answer_id,
+						"features": feats
 					};
 
 					entries.push(entry);
@@ -714,6 +944,9 @@ $(function() {
 				// Initialize their scores
 				var T = new Hashtable();
 				var S = new Set();
+				
+				// data (set of objects) to be displayed on a table
+				var D = new Set();
 
 				for (idx = 0; idx < entries.length; idx++) {
 					var e = entries[idx];
@@ -724,6 +957,7 @@ $(function() {
 				var array = [];
 				array.push(entries);
 				array.push(entries);
+				
 
 				var cartesian = product(array);
 
@@ -742,8 +976,22 @@ $(function() {
 						S.add(marker);
 					}
 					
-					var w = probabilityDensityFunction(si.code, sj.code, kernelEstimator, cartesian.length);
-
+					// todo
+					// check if its types? if it is, then 
+					
+					var ci = si.code;
+					var cj = sj.code;
+					
+					if(Searcher.atts.istypes || Searcher.atts.ispunits){
+						ci = si.features.join("\n");
+						cj = sj.features.join("\n");
+					} 
+					
+					var w = probabilityDensityFunction(ci, cj, kernelEstimator, cartesian.length);
+					
+					// capture data
+					D.add({a: si.answer_id, b: sj.answer_id, c: w});
+										
 					var Tsi = T.get(si) + w;
 					var Tsj = T.get(sj) + w;
 
@@ -758,10 +1006,6 @@ $(function() {
 					sortable.push([x, y]);
 				});
 				
-				// for (idx = 0; idx < T.keys().length; idx++) {
-				// 	var entry = T.keys()[idx];
-				// 	sortable.push([entry, T.get(entry)]);
-				// }
 
 				sortable.sort(function(a, b) {
 					return b[1] - a[1];
@@ -777,6 +1021,8 @@ $(function() {
 				
 				var radius = mean(scores);
 				
+				// HACK
+				var Dp = new Hashtable();
 				for (idx = 0; idx < sortable.length; idx++) {
 					var t = sortable[idx][1];
 					
@@ -785,6 +1031,9 @@ $(function() {
 					var s = sortable[idx][0];
 
 					var answer_id = s.answer_id;
+					
+					Dp.put(answer_id, answer_id);
+					
 					var answer_score = s.score;
 					var link = s.link ? s.link : s.href;
 					var code = s.code;
@@ -795,8 +1044,23 @@ $(function() {
 						'target': '_blank'
 					}));
 
-					Searcher.listCandidate("Code example candidate");
+					Searcher.listCandidate("typicality score: " + t);
 				}
+			
+				// return only the typical ones
+				var compatibleOnes = Array.from(D).filter(x => Dp.containsKey(x.a) && Dp.containsKey(x.b));
+				var tableView = new Hashtable(); // hashtable of sets
+				compatibleOnes.forEach(function(d){
+					if(tableView.containsKey(d.a)){
+						tableView.get(d.a).put(d.b, d.c);
+					} else {
+						var val = new Hashtable();
+						val.put(d.b, d.c);
+						tableView.put(d.a, val);
+					}
+				});
+				
+				showGaussianKernels(tableView, sortable[0][0].answer_id/*winner*/);
 
 				$('#search').attr('disabled', false).text('Again?');
 				$("input").prop('disabled', false);
@@ -810,7 +1074,7 @@ $(function() {
 		},
 
 		foundCandidates: function() {
-			Searcher.logger("Found enough suitable code snippets", "success");
+			Searcher.logger("Found enough suitable code examples", "success");
 
 			Searcher.displayer("Fetching code examples", "trying");
 			Searcher.displayer("Downloading code examples, ready to try.", "info");
@@ -889,7 +1153,7 @@ $(function() {
 
 			Searcher.logger("Fetching page " + Searcher.page + "...", "trying");
 
-			var query = $("#query").val();
+			var query = Searcher.query;	
 			var splits = query.split(/[ ,]+/);
 			
 			// stemm query and used use nouns as tags
@@ -911,7 +1175,7 @@ $(function() {
 
 			// search/advanced?todate=1471910400&order=desc&sort=relevance&q=quick%2Bselect&accepted=True&notice=False&tagged=java&site=stackoverflow
 			var common_url = '&pagesize=100&order=desc&site=stackoverflow&fromdate=960508800&todate=1496880000';
-			var question_url = Searcher.api + 'similar?q=' + uquery + '&sort=relevance&closed=False&accepted=True&notice=False&tagged=java&title=' + encoded + '&page=' + Searcher.page + common_url;
+			var question_url = Searcher.api + 'similar?' + 'sort=relevance&closed=False&accepted=True&notice=False&tagged=java&title=' + encoded + '&page=' + Searcher.page + common_url;
 
 			var titles = {};
 
@@ -1003,7 +1267,9 @@ $(function() {
 		examineAnswer: function() {
 			var answer	= Searcher.answers[Searcher.item].body;
 			var title		= Searcher.answers[Searcher.item].title;
-			var query		= $("#query").val(); 
+			
+			var query		= Searcher.query;
+			
 			var splitQ	= new Set(query.split(/[ ,]+/).map(function(x){ return stemmer(x.toLowerCase()) }));
 			var splitT	= new Set(title.split(/[ ,]+/).map(function(x){ return stemmer(x.toLowerCase()) }));
 			
@@ -1030,9 +1296,6 @@ $(function() {
 					} else {
 						var item = Searcher.answers[Searcher.item];
 						item.code = toString(blocks).join("\n");
-
-						// e.g., types, loop structures, parameter arity
-						item.features = extractCodeFeatures(wrapCodeIfNeeded(item.code));
 
 						Searcher.candidates.push(item);
 						Searcher.nextAnswer("Found a valid code example");
@@ -1071,8 +1334,15 @@ $(function() {
 	Searcher.setupConsoles();
 
 	$('#search').click(function() {
-
-		var query = $("#query").val();
+		
+		var options = {keywords: ['atts', 'sloc']};
+		var sreq = parseSReq($("#query").val(), options);
+		
+		// Extract values from SREQ objects
+		Searcher.sloc = slocSyntax(sreq.sloc); // object with limit (num) and oper attributes (str)
+		Searcher.atts = attsSyntax(sreq.atts)  // object w/tests to specific qualifiers; e.g., istypes?
+		
+		var query		= (typeof sreq == 'string' || sreq instanceof String) ? sreq : sreq.text;
 
 		if (!query) {
 			alert("Please provide a query");
@@ -1082,7 +1352,10 @@ $(function() {
 		}
 
 		ensureCleanSlate(query);
-
+		
+		// caches query
+		Searcher.query = query;
+		
 		// Disclaimer
 		// TODO: Use better modal?
 		var warn = "Ready for fetching arbitrary Java code examples from StackOverflow?";
@@ -1119,6 +1392,7 @@ $(function() {
 		if (this.checked) {
 			Searcher.computeCodeTypicality();
 		} else {
+			$("#GaussianKernel > tbody").hide();
 			Searcher.fetchCandidates();
 		}
 	}

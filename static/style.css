@@ -618,3 +618,23 @@ body .input {
 .shifted {
 	margin-left: -60pt;
 }
+
+/*Kernel stuff*/
+.kernel {
+    border-bottom: none;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.kernel caption {
+	text-align: left;
+}
+
+.kernel th, td{
+    border-top: none;
+		padding: 5px;
+}
+
+tr.highlight {
+    background-color: whitesmoke !important;
+}
