@@ -35,12 +35,12 @@ The first time you use **Stircup**, the generated results will get cached on you
 </div>
 <div id="clear"></div>
 
-# Gaussian Kernel Calculations 
+# Compatibility Calculations 
 
 After performing source code typicality analysis over the generated results, 
 you will see a table below, which will show how compatible the returned code 
 examples are with each other. The most typical code example will be highlighted
-on the table. Horizontal scrolling may be needed to uncover more results.
+in gray on the table. Horizontal scrolling may be needed to uncover more results.
 
 <div style="width: 100%; overflow: auto; font-size:60%;">
 	<table id='GaussianKernel' class="kernel">
