@@ -7,10 +7,18 @@ description: Source code typicality analyzer
 
 {% include centered.html text="Source code typicality analyzer"%}
 
-It's easy to get started with **Stircup**. You use it by first entering a query, and then pressing the **Search** button below. Behind the scenes, **Stircup** fetches a few pages of code examples from StackOverflow using their '/similar?' command[^1], ignores those ones that don't match results criteria[^2], and then returns a list of results, which can be further introspected using source code typicality analysis.
+It's easy to get started with **Stircup**. You use it by first entering a query, and then pressing the **Search** button below. Behind the scenes, **Stircup** fetches a few pages of code examples from StackOverflow using StackExchange's '/similar?' command[^1], ignores those ones that don't match results criteria[^2], and then returns a results list, which can be further introspected using source code typicality analysis.
 
 The first time you use **Stircup**, the generated results will get cached on your browser. After that, every time you search (_using the same query_), this search is done on your computer.
 
+### Demonstration Structure
+
+	1. Enter the query "Http server"
+	2. Click on search (and then wait for results)  
+	2.1 Search will return 17 results. 
+	3. Check the Typicality checkbox
+	3.1 Typicality will return 9 results
+	3.2 Display a table with likelihood calculations 
 
 <div id="columns">
     <div id="left-col">
@@ -35,12 +43,14 @@ The first time you use **Stircup**, the generated results will get cached on you
 </div>
 <div id="clear"></div>
 
-# Compatibility Calculations 
+# Likelihood Calculations (Between Typical Code Examples)
 
 After performing source code typicality analysis over the generated results, 
-you will see a table below, which will show how compatible the returned code 
-examples are with each other. The most typical code example will be highlighted
-in gray on the table. Horizontal scrolling may be needed to uncover more results.
+you will see a table below, which will show the likelihood of typical 
+code examples of being together in the returned result set. __Compatibility 
+calculations of atypical code examples are not displayed in this table__. 
+The most typical code example will be highlighted on the table. Horizontal 
+scrolling may be needed to uncover more results.
 
 <div style="width: 100%; overflow: auto; font-size:60%;">
 	<table id='GaussianKernel' class="kernel">

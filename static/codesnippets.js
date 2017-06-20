@@ -48,6 +48,14 @@ $(function() {
 			return this.replace(/^\s+|\s+$/g, '');
 		};
 	}
+	
+	function pairwise(list) {
+	  if (list.length < 2) { return []; }
+	  var first = list[0],
+	      rest  = list.slice(1),
+	      pairs = rest.map(function (x) { return [first, x]; });
+	  return pairs.concat(pairwise(rest));
+	}
 
 	function product(args) {
 		if (!args.length)
@@ -635,7 +643,8 @@ $(function() {
 					if(i === j){ // add zero
 						newRow.append($('<td>' + 0.0 + '</td>'));	
 					} else {
-						newRow.append($('<td>' + val.get(j) + '</td>'));	
+						var score = val.get(j) || 0.0;
+						newRow.append($('<td>' + score + '</td>'));	
 					}
 					
 				});
@@ -829,25 +838,13 @@ $(function() {
 
 			// Output!
 			setTimeout(function() {
-				// var candidates = [];
-				// if (Searcher.candidates.length == 0) {
-				// 	candidates = parseArray(window.localStorage.cached).items;
-				// } else {
-				// 	candidates = Searcher.candidates;
-				// }
 
-				// // Get all source code lines of code
-				// var sizes = [];
-				// candidates.forEach(function(val) {
-				// 	sizes.push(countSloc(val.code).sloc);
-				// });
-
-				// Compute their variance and standard deviation
-				var variance = Searcher.variance; //computeVariance(sizes);
-				var standDev = Searcher.standDev; //computeStandardDeviation(variance);
+				// Get the variance and standard deviation
+				var variance = Searcher.variance;
+				var standDev = Searcher.standDev;
 
 				// Compute kernel estimator or bandwidth
-				var kernelEstimator = Searcher.kernelEstimator; //(1.06 * standDev) / Math.pow(sizes.length, (1.0 / 5));
+				var kernelEstimator = Searcher.kernelEstimator;
 
 				var entries = [];
 				var candidateArray = Searcher.candidateArray;
@@ -861,6 +858,7 @@ $(function() {
 					var answer_score = answerObject.score;
 					var link = answerObject.link ? answerObject.link : answerObject.href;
 					var code = answerObject.code;
+					
 					// e.g., types, loop structures, parameter arity
 					var feats = extractCodeFeatures(wrapCodeIfNeeded(code));
 
@@ -878,54 +876,68 @@ $(function() {
 
 				// Initialize their scores
 				var T = new Hashtable();
-				var S = new Set();
+				var S = new Hashtable();
 				
 				// data (set of objects) to be displayed on a table
-				var D = new Set();
+				var Comparissons = new Set();
 
 				for (idx = 0; idx < entries.length; idx++) {
 					var e = entries[idx];
 					T.put(e, 0.0);
+				}
+				
+				function skipComparisson(hashtable, si, sj){
+					if(hashtable.containsKey(si.answer_id)){
+						if(hashtable.get(si.answer_id).has(sj.answer_id))  { 
+							return true; 
+						} else {
+							hashtable.get(si.answer_id).add(sj.answer_id);
+						}
+					} else if (hashtable.containsKey(sj.answer_id)){
+						if(hashtable.get(sj.answer_id).has(si.answer_id)) { 
+							return true; 
+						} else {
+							hashtable.get(sj.answer_id).add(si.answer_id);
+						}
+					}
+	
+					
+					return false;
+				}
+				
+				function getAttributes(obj){
+					var cobj = obj.code;
+					
+					if(Searcher.atts.istypes || Searcher.atts.ispunits){
+						cobj = obj.features.join("\n");
+					} 
+					
+					return cobj;
 				}
 
 				// Compute each entry's typicality score
 				var array = [];
 				array.push(entries);
 				array.push(entries);
-				
-
+							
 				var cartesian = product(array);
-
+				
 				for (idx = 0; idx < cartesian.length; idx++) {
 					var pair = cartesian[idx];
 
 					var si = pair[0];
 					var sj = pair[1];
 
-					if(si.code === sj.code) continue;
-					var marker = new Set([si.answer_id, sj.answer_id]);
+					if(si.answer_id === sj.answer_id) continue;
+					if(skipComparisson(S, si, sj))    continue;
 					
-					if(S.has(marker)){
-						continue;
-					} else {
-						S.add(marker);
-					}
-					
-					// todo
-					// check if its types? if it is, then 
-					
-					var ci = si.code;
-					var cj = sj.code;
-					
-					if(Searcher.atts.istypes || Searcher.atts.ispunits){
-						ci = si.features.join("\n");
-						cj = sj.features.join("\n");
-					} 
+					var ci = getAttributes(si);
+					var cj = getAttributes(sj);
 					
 					var w = probabilityDensityFunction(ci, cj, kernelEstimator, cartesian.length);
 					
 					// capture data
-					D.add({a: si.answer_id, b: sj.answer_id, c: w});
+					Comparissons.add({a: si.answer_id, b: sj.answer_id, c: w});
 										
 					var Tsi = T.get(si) + w;
 					var Tsj = T.get(sj) + w;
@@ -957,7 +969,7 @@ $(function() {
 				var radius = mean(scores);
 				
 				// HACK
-				var Dp = new Hashtable();
+				var chosen = new Hashtable();
 				for (idx = 0; idx < sortable.length; idx++) {
 					var t = sortable[idx][1];
 					
@@ -967,7 +979,7 @@ $(function() {
 
 					var answer_id = s.answer_id;
 					
-					Dp.put(answer_id, answer_id);
+					chosen.put(answer_id, answer_id);
 					
 					var answer_score = s.score;
 					var link = s.link ? s.link : s.href;
@@ -982,8 +994,8 @@ $(function() {
 					Searcher.listCandidate("typicality score: " + t);
 				}
 			
-				// return only the typical ones
-				var compatibleOnes = Array.from(D).filter(x => Dp.containsKey(x.a) && Dp.containsKey(x.b));
+				// display only the typical ones
+				var compatibleOnes = Array.from(Comparissons).filter(x => chosen.containsKey(x.a));
 				var tableView = new Hashtable(); // hashtable of sets
 				compatibleOnes.forEach(function(d){
 					if(tableView.containsKey(d.a)){
@@ -1326,31 +1338,47 @@ $(function() {
 		$('#displayer').empty();
 		if (this.checked) {
 			setTimeout(function(){
-				
-				var candidates = [];
-				if (Searcher.candidates.length == 0) {
-					candidates = parseArray(window.localStorage.cached).items;
+						
+				var query		= $("#query").val();
+
+				if (!query) {
+					alert("Please provide a query");
+					
+					checkboxArray.forEach(function(checkbox) {
+						$(checkbox).attr('checked', false);
+					});
+					
+					$("#query").focus();					
+					
+					return;
 				} else {
-					candidates = Searcher.candidates;
+					var candidates = [];
+					if (Searcher.candidates.length == 0) {
+						candidates = parseArray(window.localStorage.cached).items;
+					} else {
+						candidates = Searcher.candidates;
+					}
+				
+					Searcher.candidateArray = candidates;
+				
+					// Get all source code lines of code
+					var sizes = [];
+					candidates.forEach(function(val) {
+						sizes.push(countSloc(val.code).sloc);
+					});
+
+					// Compute their variance and standard deviation
+					Searcher.variance = computeVariance(sizes);
+					Searcher.standDev = computeStandardDeviation(Searcher.variance);
+					// Compute kernel estimator or bandwidth
+					Searcher.kernelEstimator = (1.06 * Searcher.standDev) / Math.pow(sizes.length, (1.0 / 5));
+				
+					setTimeout(function(){
+						Searcher.computeCodeTypicality();
+					});
 				}
 				
-				Searcher.candidateArray = candidates;
 				
-				// Get all source code lines of code
-				var sizes = [];
-				candidates.forEach(function(val) {
-					sizes.push(countSloc(val.code).sloc);
-				});
-
-				// Compute their variance and standard deviation
-				Searcher.variance = computeVariance(sizes);
-				Searcher.standDev = computeStandardDeviation(Searcher.variance);
-				// Compute kernel estimator or bandwidth
-				Searcher.kernelEstimator = (1.06 * Searcher.standDev) / Math.pow(sizes.length, (1.0 / 5));
-				
-				setTimeout(function(){
-					Searcher.computeCodeTypicality();
-				});
 			}, 230);
 		} else {
 			$("#GaussianKernel > tbody").hide();
