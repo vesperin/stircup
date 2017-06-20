@@ -43,13 +43,13 @@ The first time you use **Stircup**, the generated results will get cached on you
 </div>
 <div id="clear"></div>
 
-# Likelihood Calculations (Between Typical Code Examples)
+<!-- # Probability density function -->
 
-After performing source code typicality analysis over the generated results, 
-you will see a table below, which will show the likelihood of typical 
-code examples of being together in the returned result set. __Compatibility 
-calculations of atypical code examples are not displayed in this table__. 
-The most typical code example will be highlighted on the table. Horizontal 
+<!-- After performing source code typicality analysis over the generated results,
+you will see a table below, which will show the likelihood of typical
+code examples of being together in the returned result set. __Compatibility
+calculations of atypical code examples are not displayed in this table__.
+The most typical code example will be highlighted on the table. Horizontal
 scrolling may be needed to uncover more results.
 
 <div style="width: 100%; overflow: auto; font-size:60%;">
@@ -57,8 +57,9 @@ scrolling may be needed to uncover more results.
 		<tbody style="display:none">
 		</tbody>
 	</table>
-</div>
+</div> -->
 
+<center><div id="chart_div"></div></center>
 
 Thank you for trying this app.
 

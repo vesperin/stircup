@@ -42,6 +42,52 @@ $(function() {
 
 		return JSON.parse(array);
 	}
+	
+	function drawChart(data) {
+		data = data || [
+      ['Code example', 'Typicality'],
+      ['0000001', 12.2],
+      ['0000002', 9.1],
+      ['0000003', 12.2],
+      ['0000004', 22.9],
+      ['0000005', 0.9],
+      ['0000006', 36.6],
+      ['0000007', 9.1],
+      ['0000008', 30.5],
+      ['0000009', 6.1]];
+		
+		var data = google.visualization.arrayToDataTable(data);
+
+			var options = {
+			  title: 'Approximating Normal Distribution',
+			  legend: { position: 'none' },
+			  colors: ['#333333'],
+
+			  chartArea: { width: 501 },
+			  bar: { gap: 0 },
+				
+				hAxis: {
+					slantedText: true,  /* Enable slantedText for horizontal axis */
+				  slantedTextAngle: 45, /* Define slant Angle */
+					format: 'decimal'
+				},
+
+			  histogram: {
+			    bucketSize: 0.01,
+			    maxNumBuckets: 200,
+			    minValue: -1,
+			    maxValue: 1
+			  }
+			};		
+		
+		
+		var chart_div = document.getElementById('chart_div');
+	  var chart = new google.visualization.AreaChart(chart_div);
+		
+		$(chart_div).show();
+
+	  chart.draw(data, options);
+  }	
 
 	if (!String.prototype.trim) {
 		String.prototype.trim = function() {
@@ -598,19 +644,6 @@ $(function() {
 		return Math.round(num * shift) / shift;
 	};
 	
-	function sameId(a, b) {
-	  var nameA = a.name.toUpperCase(); // ignore upper and lowercase
-	  var nameB = b.name.toUpperCase(); // ignore upper and lowercase
-	  if (nameA < nameB) {
-	    return -1;
-	  }
-	  if (nameA > nameB) {
-	    return 1;
-	  }
-
-	  // names must be equal
-	  return 0;
-	}
 	
 	function showGaussianKernels(tableView/*hashtable*/, winner){
 		setTimeout(function() {
@@ -658,6 +691,10 @@ $(function() {
 			
 			
 			gausstable.show();
+			
+			setTimeout(function() {
+				drawChart();
+			}, 230);
 						
 		}, 230);
 	}
@@ -969,6 +1006,8 @@ $(function() {
 				var radius = mean(scores);
 				
 				// HACK
+				var chartdata = [];
+				chartdata.push(['Code example', 'Typicality']);
 				var chosen = new Hashtable();
 				for (idx = 0; idx < sortable.length; idx++) {
 					var t = sortable[idx][1];
@@ -980,6 +1019,8 @@ $(function() {
 					var answer_id = s.answer_id;
 					
 					chosen.put(answer_id, answer_id);
+					
+					chartdata.push([answer_id.toString(), t]);
 					
 					var answer_score = s.score;
 					var link = s.link ? s.link : s.href;
@@ -1007,7 +1048,9 @@ $(function() {
 					}
 				});
 				
-				showGaussianKernels(tableView, sortable[0][0].answer_id/*winner*/);
+				// setTimeout(function(){
+				// 	drawChart(chartdata);
+				// }, 230);
 
 				$('#search').attr('disabled', false).text('Again?');
 				$("input").prop('disabled', false);
@@ -1279,6 +1322,7 @@ $(function() {
 
 	Searcher.wait(false);
 	Searcher.setupConsoles();
+	$(document.getElementById('chart_div')).hide();
 
 	$('#search').click(function() {
 		
@@ -1382,6 +1426,7 @@ $(function() {
 			}, 230);
 		} else {
 			$("#GaussianKernel > tbody").hide();
+			$(document.getElementById('chart_div')).hide();
 			Searcher.fetchCandidates();
 		}
 	}

@@ -640,3 +640,12 @@ body .input {
 tr.highlight {
     background-color: whitesmoke !important;
 }
+
+#chart_div {
+    width: 900px;
+		height: 500px;
+		
+    float: left;
+    margin-left: -130px;
+		margin-top: 3px;
+}
