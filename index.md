@@ -18,7 +18,7 @@ The first time you use **Stircup**, the generated results will get cached on you
 	2.1 Search will return 17 results. 
 	3. Check the Typicality checkbox
 	3.1 Typicality will return 9 results
-	3.2 Display a table with likelihood calculations 
+	3. Display a table with likelihood calculations 
 
 <div id="columns">
     <div id="left-col">
