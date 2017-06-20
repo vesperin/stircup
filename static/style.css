@@ -528,6 +528,7 @@ body .input {
 #columns {
     float: left;
     width: 100%;
+		margin-left:6px;
 }
 #left-col {
     margin-right: 200px;
@@ -542,6 +543,7 @@ body .input {
     float: left;
     width: 200px;
     margin-left: -320px;
+		margin-top: 3px;
 }
 
 #right-col h4 {
