@@ -7,18 +7,18 @@ description: Source code typicality analyzer
 
 {% include centered.html text="Source code typicality analyzer"%}
 
-It's easy to get started with **Stircup**. You use it by first entering a query, and then pressing the **Search** button below. Behind the scenes, **Stircup** fetches a few pages of code examples from StackOverflow using StackExchange's '/similar?' command[^1], ignores those ones that don't match results criteria[^2], and then returns a results list, which can be further introspected using source code typicality analysis.
+It's easy to get started with **Stircup**. You use it by first entering a query, and then pressing the **Search** button below. Behind the scenes, **Stircup** fetches a few pages of code examples from StackOverflow using StackExchange's '/similar?' command[^1], ignores those ones that don't match our results criteria[^2], and then returns a results list, which can be further introspected using source code typicality analysis.
 
 The first time you use **Stircup**, the generated results will get cached on your browser. After that, every time you search (_using the same query_), this search is done on your computer.
 
 ### Demonstration Structure
 
-	1. Enter the query "Http server"
-	2. Click on search (and then wait for results)  
-	2.1 Search will return 17 results. 
+	1. Enter the following query "Http server".
+	2. Click on the search (and then wait for results)  
+	2.1 Selection console displays 17 results. 
 	3. Check the Typicality checkbox
-	3.1 Typicality will return 9 results
-	3. Display a table with likelihood calculations 
+	3.1 Selection console displays 9 most typical results
+	3. A chart containing typicality scores for all in 2.1. 
 
 <div id="columns">
     <div id="left-col">
@@ -43,7 +43,7 @@ The first time you use **Stircup**, the generated results will get cached on you
 </div>
 <div id="clear"></div>
 
-<!-- # Probability density function -->
+# Source code Typicality scores
 
 <!-- After performing source code typicality analysis over the generated results,
 you will see a table below, which will show the likelihood of typical
@@ -58,6 +58,10 @@ scrolling may be needed to uncover more results.
 		</tbody>
 	</table>
 </div> -->
+
+After performing source code typicality analysis over all the generated 
+results (by checking the Typicality checkbox), you will see below an area 
+chart displaying the typicality scores of all the generated results. 
 
 <center><div id="chart_div"></div></center>
 

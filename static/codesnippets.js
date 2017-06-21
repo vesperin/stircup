@@ -44,47 +44,79 @@ $(function() {
 	}
 	
 	function drawChart(data) {
-		data = data || [
-      ['Code example', 'Typicality'],
-      ['0000001', 12.2],
-      ['0000002', 9.1],
-      ['0000003', 12.2],
-      ['0000004', 22.9],
-      ['0000005', 0.9],
-      ['0000006', 36.6],
-      ['0000007', 9.1],
-      ['0000008', 30.5],
-      ['0000009', 6.1]];
+			
+			data = data || [
+				['Code Example', 'Typicality'],
+				['1', 0.292647287636152],
+				['2', 0.29199225810537754],
+				['3', 0.29194597721237286],
+				['4', 0.2929354020271038],
+				['5', 0.2920510169277978],
+				['6', 0.2911478136277486],
+				['7', 0.2921536295040776],
+				['8', 0.2913884440434484],
+				['9', 0.2923937887190767],
+				['10', 0.2928719348879969],
+				['11', 0.2932117446624235],
+				['12', 0.29264790351455316],
+				['13', 0.2926977328883194],
+				['14', 0.2925780097711295],
+				['15', 0.29221171229723497],
+				['16', 0.2921761394437954],
+				['17', 0.2926193719831474]];	
+				
+		var ranked = [];
+		for(var i = 1; i < data.length; i++){
+		  ranked.push(data[i][1]);
+		}	
+			
+		ranked.sort(function(a, b){
+			return b - a;
+		});
+		
+			
+		var min = ranked[ranked.length - 1];
+		var max = ranked[0];
 		
 		var data = google.visualization.arrayToDataTable(data);
-
-			var options = {
-			  title: 'Approximating Normal Distribution',
-			  legend: { position: 'none' },
-			  colors: ['#333333'],
-
-			  chartArea: { width: 501 },
-			  bar: { gap: 0 },
-				
-				hAxis: {
-					slantedText: true,  /* Enable slantedText for horizontal axis */
-				  slantedTextAngle: 45, /* Define slant Angle */
-					format: 'decimal'
-				},
-
-			  histogram: {
-			    bucketSize: 0.01,
-			    maxNumBuckets: 200,
-			    minValue: -1,
-			    maxValue: 1
-			  }
-			};		
+		var options = {
+			// title: 'Source code Typicality Scores',
+			legend: { position: 'none' },
+			colors: ['#333333'],
+			pointSize: 5,
+			
+			hAxis: {
+				title: 'Code Examples',
+				minorGridlines: 12,
+				scaleType: 'log',
+				slantedText: true,  /* Enable slantedText for horizontal axis */
+				slantedTextAngle: 45, /* Define slant Angle */
+				gridlines: {color: '#333333', count: 4}
+			},
+			
+			vAxis: {
+				title: 'Typicality',
+				minValue: min,
+				maxValue: max,
+				format: 'decimal'
+			},
+			
+			chartArea: { width: 500 }
+			
+		};
 		
+		var formatter = new google.visualization.NumberFormat({ 
+			pattern: '#.#################', 
+			fractionDigits: 17
+		});
 		
+		formatter.format(data, 1);
+			
 		var chart_div = document.getElementById('chart_div');
 	  var chart = new google.visualization.AreaChart(chart_div);
 		
 		$(chart_div).show();
+		$('#chart_div > h1').show();
 
 	  chart.draw(data, options);
   }	
@@ -390,7 +422,7 @@ $(function() {
 		if(Searcher.atts.isgrams || Searcher.atts.istypes || Searcher.atts.ispunits){
 			return 1.0 - cosineSimilarity(a, b);
 		} else {
-			return 1.0 - normalizedEditDistance(a, b);
+			return 1.0 - (editDistance(a, b) / 1.0);
 		}
 	}
 
@@ -431,14 +463,28 @@ $(function() {
 	function computeStandardDeviation(variance) {
 		return Math.sqrt(variance);
 	}
+	
+	// Scale pdf by constant c
+  function scale(x, y, estimator, variance, c) {
+		variance = variance * c * c;
+    return pdf(x, y, estimator * c, Math.sqrt(variance));
+  };
+	
+	// Probability density function
+  function pdf(x, y, estimator, standardDeviation) {
+    var m = standardDeviation * Math.sqrt(2 * Math.PI);
+		var d = distance(x, y);
+    var e = Math.exp(-Math.pow(d, 2) / (2 * estimator));
+    return e / m;
+  };
 
 	// probabilityDensityFunction
 	function probabilityDensityFunction(x, y, estimator, nconst) {
-		var a = 1.0 / (Math.sqrt(2 * Math.PI) * nconst /*normalized constant*/);
+		var a = 1.0 / (Math.sqrt(2 * Math.PI) * (nconst) /*normalized constant*/);
 		var d = distance(x, y);
 		var h = 2 * estimator;
 		var e = Math.exp(-(Math.pow(d, 2) / Math.pow(h, 2)));
-		return a * e;
+		return (a * e);
 	};
 
 	var CLASS_PATTERN = /class[^;=\n]*\s[\S\s]*?(?={)/;
@@ -704,6 +750,7 @@ $(function() {
 	}
 
 	function ensureCleanSlate(query) {
+		query = query.trim();
 		if (window.localStorage.query !== query) {
 			delete window.localStorage.answers;
 			delete window.localStorage.ss_page;
@@ -871,7 +918,7 @@ $(function() {
 
 		computeCodeTypicality: function() {
 
-			Searcher.displayer("Sorting code examples by typicality.", "info");
+			Searcher.displayer("Sampling code examples by typicality.", "info");
 
 			// Output!
 			setTimeout(function() {
@@ -965,13 +1012,13 @@ $(function() {
 					var si = pair[0];
 					var sj = pair[1];
 
-					if(si.answer_id === sj.answer_id) continue;
-					if(skipComparisson(S, si, sj))    continue;
+					// if(si.answer_id === sj.answer_id) continue;
+// 					if(skipComparisson(S, si, sj))    continue;
 					
 					var ci = getAttributes(si);
 					var cj = getAttributes(sj);
 					
-					var w = probabilityDensityFunction(ci, cj, kernelEstimator, cartesian.length);
+					var w = pdf(ci, cj, kernelEstimator, standDev);
 					
 					// capture data
 					Comparissons.add({a: si.answer_id, b: sj.answer_id, c: w});
@@ -1020,7 +1067,7 @@ $(function() {
 					
 					chosen.put(answer_id, answer_id);
 					
-					chartdata.push([answer_id.toString(), t]);
+					//chartdata.push([answer_id.toString(), t]);
 					
 					var answer_score = s.score;
 					var link = s.link ? s.link : s.href;
@@ -1048,9 +1095,13 @@ $(function() {
 					}
 				});
 				
-				// setTimeout(function(){
-				// 	drawChart(chartdata);
-				// }, 230);
+				T.keys().forEach(function(k){
+					chartdata.push([k.answer_id.toString(), parseFloat(T.get(k))]);
+				});
+				
+				setTimeout(function(){
+					drawChart(chartdata);
+				}, 230);
 
 				$('#search').attr('disabled', false).text('Again?');
 				$("input").prop('disabled', false);

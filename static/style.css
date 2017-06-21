@@ -642,10 +642,11 @@ tr.highlight {
 }
 
 #chart_div {
-    width: 900px;
-		height: 500px;
+	display: none;
+  width: 900px;
+	height: 500px;
 		
-    float: left;
-    margin-left: -130px;
-		margin-top: 3px;
+  float: left;
+  margin-left: -65px;
+	margin-top: -10px;
 }
