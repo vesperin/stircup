@@ -85,6 +85,7 @@ $(function() {
 			colors: ['#333333'],
 			pointSize: 5,
 			curveType: 'function',
+			intervals: { 'style':'area', 'color':'series-color' },
 			
 			hAxis: {
 				title: 'Code Examples',
@@ -1088,7 +1089,7 @@ $(function() {
 						if(chosen.containsKey(k.answer_id)){
 							scores.push([k.answer_id.toString(), T.get(k), 'stroke-color: #333333; stroke-width: 3;']);
 						} else {
-							scores.push([k.answer_id.toString(), T.get(k), 'color: #4d4d4d']);
+							scores.push([k.answer_id.toString(), T.get(k), 'color: #4d4d4d; stroke-width: 1;']);
 						}
 						//chartdata.push([k.answer_id.toString(), T.get(k)]);
 					});
@@ -1106,7 +1107,7 @@ $(function() {
 						}
 					}
 
-					tail.forEach(function(x){
+					scores.forEach(function(x){
 						chartdata.push(x);
 					});
 					
