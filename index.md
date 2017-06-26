@@ -61,7 +61,8 @@ scrolling may be needed to uncover more results.
 
 After performing source code typicality analysis over all the generated 
 results (by checking the Typicality checkbox), you will see below an area 
-chart displaying the typicality scores of all the generated results. 
+chart displaying the typicality scores of all the generated results. Thick 
+circles are typical code examples and thin circles are atypical ones. 
 
 <center><div id="chart_div"></div></center>
 

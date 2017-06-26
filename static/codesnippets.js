@@ -45,25 +45,25 @@ $(function() {
 	
 	function drawChart(data) {
 			
-			data = data || [
-				['Code Example', 'Typicality'],
-				['1', 0.292647287636152],
-				['2', 0.29199225810537754],
-				['3', 0.29194597721237286],
-				['4', 0.2929354020271038],
-				['5', 0.2920510169277978],
-				['6', 0.2911478136277486],
-				['7', 0.2921536295040776],
-				['8', 0.2913884440434484],
-				['9', 0.2923937887190767],
-				['10', 0.2928719348879969],
-				['11', 0.2932117446624235],
-				['12', 0.29264790351455316],
-				['13', 0.2926977328883194],
-				['14', 0.2925780097711295],
-				['15', 0.29221171229723497],
-				['16', 0.2921761394437954],
-				['17', 0.2926193719831474]];	
+		data = data || [
+			['Code Example', 'Typicality'],
+			['1', 0.292647287636152],
+			['2', 0.29199225810537754],
+			['3', 0.29194597721237286],
+			['4', 0.2929354020271038],
+			['5', 0.2920510169277978],
+			['6', 0.2911478136277486],
+			['7', 0.2921536295040776],
+			['8', 0.2913884440434484],
+			['9', 0.2923937887190767],
+			['10', 0.2928719348879969],
+			['11', 0.2932117446624235],
+			['12', 0.29264790351455316],
+			['13', 0.2926977328883194],
+			['14', 0.2925780097711295],
+			['15', 0.29221171229723497],
+			['16', 0.2921761394437954],
+			['17', 0.2926193719831474]];
 				
 		var ranked = [];
 		for(var i = 1; i < data.length; i++){
@@ -84,14 +84,14 @@ $(function() {
 			legend: { position: 'none' },
 			colors: ['#333333'],
 			pointSize: 5,
+			curveType: 'function',
 			
 			hAxis: {
 				title: 'Code Examples',
 				minorGridlines: 12,
-				scaleType: 'log',
 				slantedText: true,  /* Enable slantedText for horizontal axis */
 				slantedTextAngle: 45, /* Define slant Angle */
-				gridlines: {color: '#333333', count: 4}
+				gridlines: {color: '#333333', count: 5}
 			},
 			
 			vAxis: {
@@ -101,7 +101,7 @@ $(function() {
 				format: 'decimal'
 			},
 			
-			chartArea: { width: 500 }
+			chartArea: { width: 500 },
 			
 		};
 		
@@ -1013,7 +1013,7 @@ $(function() {
 					var sj = pair[1];
 
 					// if(si.answer_id === sj.answer_id) continue;
-// 					if(skipComparisson(S, si, sj))    continue;
+					// if(skipComparisson(S, si, sj))    continue;
 					
 					var ci = getAttributes(si);
 					var cj = getAttributes(sj);
@@ -1054,7 +1054,7 @@ $(function() {
 				
 				// HACK
 				var chartdata = [];
-				chartdata.push(['Code example', 'Typicality']);
+				chartdata.push(['Code example', 'Typicality', { role: 'style' } ]);
 				var chosen = new Hashtable();
 				for (idx = 0; idx < sortable.length; idx++) {
 					var t = sortable[idx][1];
@@ -1081,26 +1081,38 @@ $(function() {
 
 					Searcher.listCandidate("typicality score: " + t);
 				}
-			
-				// display only the typical ones
-				var compatibleOnes = Array.from(Comparissons).filter(x => chosen.containsKey(x.a));
-				var tableView = new Hashtable(); // hashtable of sets
-				compatibleOnes.forEach(function(d){
-					if(tableView.containsKey(d.a)){
-						tableView.get(d.a).put(d.b, d.c);
-					} else {
-						var val = new Hashtable();
-						val.put(d.b, d.c);
-						tableView.put(d.a, val);
-					}
-				});
-				
-				T.keys().forEach(function(k){
-					chartdata.push([k.answer_id.toString(), parseFloat(T.get(k))]);
-				});
 				
 				setTimeout(function(){
-					drawChart(chartdata);
+					var scores = [];
+					T.keys().forEach(function(k){
+						if(chosen.containsKey(k.answer_id)){
+							scores.push([k.answer_id.toString(), T.get(k), 'stroke-color: #333333; stroke-width: 3;']);
+						} else {
+							scores.push([k.answer_id.toString(), T.get(k), 'color: #4d4d4d']);
+						}
+						//chartdata.push([k.answer_id.toString(), T.get(k)]);
+					});
+				
+					scores.sort(function(a, b){
+						return b[1] - a[1];
+					});
+
+					var tail = [];
+					for(var i = 0; i < scores.length; i++){
+						if(i % 2 === 0){
+							tail.push(scores[i]);
+						} else {
+							tail.unshift(scores[i]);
+						}
+					}
+
+					tail.forEach(function(x){
+						chartdata.push(x);
+					});
+					
+					setTimeout(function(){
+						drawChart(chartdata);
+					}, 230);
 				}, 230);
 
 				$('#search').attr('disabled', false).text('Again?');
